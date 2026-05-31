@@ -1,0 +1,571 @@
+/* ============================================================
+   PDC — Plan de Charge — Styles principaux
+   ============================================================ */
+
+:root {
+    --pdc-primary: #2c5aa0;
+    --pdc-secondary: #34495e;
+    --pdc-success: #27ae60;
+    --pdc-warning: #f39c12;
+    --pdc-danger: #e74c3c;
+    --pdc-info: #3498db;
+    --pdc-light: #ecf0f1;
+    --pdc-dark: #2c3e50;
+    --pdc-vert: #27ae60;
+    --pdc-jaune: #f1c40f;
+    --pdc-orange: #e67e22;
+    --pdc-rouge: #e74c3c;
+}
+
+/* ---- Page de connexion ---- */
+
+.pdc-login-page {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pdc-login-container {
+    max-width: 400px;
+    width: 100%;
+    padding: 20px;
+}
+
+.pdc-login-logo {
+    text-align: center;
+    color: #fff;
+    margin-bottom: 30px;
+}
+
+.pdc-login-logo h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 15px;
+    letter-spacing: 1px;
+}
+
+.pdc-login-panel {
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    border-radius: 10px;
+    overflow: hidden;
+    border: none;
+}
+
+.pdc-login-panel .panel-body {
+    padding: 30px;
+    background-color: white;
+}
+
+/* ---- Navigation principale ---- */
+
+.pdc-navbar {
+    background: linear-gradient(90deg, var(--pdc-primary) 0%, var(--pdc-secondary) 100%);
+    border: none;
+    margin-bottom: 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.pdc-navbar .navbar-brand,
+.pdc-navbar .navbar-nav > li > a {
+    color: #fff !important;
+    font-weight: 500;
+}
+
+.pdc-navbar .navbar-brand:hover,
+.pdc-navbar .navbar-nav > li > a:hover {
+    background-color: rgba(255,255,255,0.1) !important;
+}
+
+.pdc-navbar .navbar-nav > .dropdown > a .caret {
+    border-top-color: #fff;
+    border-bottom-color: #fff;
+}
+
+.pdc-navbar .navbar-toggle {
+    border-color: rgba(255,255,255,0.3);
+}
+
+.pdc-navbar .navbar-toggle .icon-bar {
+    background-color: #fff;
+}
+
+/* ---- Conteneur principal ---- */
+
+.pdc-main-wrapper {
+    min-height: 100vh;
+    background-color: #f5f7fa;
+}
+
+.pdc-container {
+    padding: 30px 15px;
+}
+
+/* ---- Breadcrumb ---- */
+
+.pdc-breadcrumb {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    font-size: 16px;
+}
+
+.pdc-breadcrumb > li + li:before {
+    content: "›";
+    padding: 0 8px;
+    color: #999;
+}
+
+.pdc-breadcrumb a {
+    color: var(--pdc-primary);
+    text-decoration: none;
+}
+
+.pdc-breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+/* ---- Barre d'outils ---- */
+
+.pdc-toolbar {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.pdc-periode-form .form-group {
+    margin-right: 10px;
+    margin-bottom: 0;
+}
+
+.pdc-periode-form label {
+    margin-right: 5px;
+    font-weight: 500;
+}
+
+/* ---- Cartes (liste entreprises/départements/services) ---- */
+
+.pdc-items-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.pdc-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    border-left: 5px solid var(--pdc-primary);
+}
+
+.pdc-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+.pdc-card h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.pdc-card h3 a {
+    color: var(--pdc-dark);
+    text-decoration: none;
+}
+
+.pdc-card h3 a:hover {
+    color: var(--pdc-primary);
+}
+
+.pdc-card h3 i {
+    margin-right: 10px;
+    color: var(--pdc-primary);
+}
+
+/* ---- Domaines et projets ---- */
+
+.pdc-domaines-container {
+    padding: 20px;
+}
+
+.pdc-domaine {
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 2px solid #eee;
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+
+
+}
+
+.pdc-domaine:last-child {
+    border-bottom: none;
+}
+
+.pdc-domaine-header {
+    margin-bottom: 20px;
+}
+
+.pdc-domaine-titre {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--pdc-primary);
+    display: inline-block;
+    margin: 0;
+    cursor:move;
+}
+
+.pdc-edit-domaine {
+    color: #999;
+    font-size: 20px;
+    vertical-align: middle;
+    padding:0;
+}
+
+.pdc-edit-domaine:hover {
+    color: var(--pdc-primary);
+}
+
+.pdc-add-projet {
+    color: #999;
+    font-size: 20px;
+    vertical-align: middle;
+    padding:0;
+}
+
+.pdc-add-projet:hover {
+    color: var(--pdc-success);
+}
+
+.pdc-projets-list {
+    padding-left: 20px;
+    padding-bottom: 20px;
+    min-height: 50px;
+}
+
+.pdc-projet-placeholder{
+    border: 1px dotted black;
+    background-color: #666;
+    border-radius: 30px;
+    height:40px;
+}
+
+.pdc-projet {
+    margin-bottom: 20px;
+    padding: 15px;
+    padding-left:30px;
+    padding-right:30px;
+    background-color: #f0f0f09f;
+    border-radius: 8px;
+    border-left: 4px solid var(--pdc-info);
+}
+
+.pdc-projet-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.pdc-projet-titre {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--pdc-dark);
+    cursor:move;
+}
+
+.pdc-edit-projet {
+    color: #999;
+}
+
+.pdc-edit-projet:hover {
+    color: var(--pdc-primary);
+}
+
+/* ---- Frise temporelle ---- */
+
+.pdc-frise-container {
+    position: relative;
+    min-height: 80px;
+}
+
+.pdc-frise {
+    position: relative;
+    height: 60px;
+    margin: 10px 0;
+}
+
+.pdc-frise-arrow {
+    position: absolute;
+    top: 25px;
+    height: 10px;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.pdc-frise-arrow-before:before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: -5px;
+    width: 0;
+    height: 0;
+    border-right: 10px solid;
+    border-right-color: inherit;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+}
+
+.pdc-frise-arrow-after:after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: -5px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid;
+    border-left-color: inherit;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+}
+
+.pdc-weeks {
+    position: relative;
+    height: 25px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+}
+
+.pdc-week-label {
+    position: absolute;
+    top: -15px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    border-left: 1px solid lightgray;
+}
+
+.pdc-jalon {
+    position: absolute;
+    top: 20px;
+    z-index: 10;
+}
+
+.pdc-jalon-triangle {
+    display : inline-block;
+    height : 0;
+    width : 0;
+    border-right : 8px solid transparent;
+    border-bottom : 15px solid red;
+    border-left : 7px solid transparent;
+    margin-top: 15px;
+    z-index: 10;
+}
+
+.pdc-jalon-libelle {
+    text-align: center;
+    font-size: 11px;
+    margin-top: 5px;
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    z-index: 10;
+}
+
+.pdc-jalon-pointille {
+    position: absolute;
+    top: 48px;
+    border-bottom: 2px dashed #999;
+    border-left: 2px solid #999;
+    border-right: 2px solid #999;
+    z-index: 0;
+}
+
+/* ---- Couleurs ---- */
+
+.pdc-couleur-vert   { border-bottom-color: var(--pdc-vert);   }
+.pdc-couleur-jaune  { border-bottom-color: var(--pdc-jaune);  }
+.pdc-couleur-orange { border-bottom-color: var(--pdc-orange); }
+.pdc-couleur-rouge  { border-bottom-color: var(--pdc-rouge);  }
+
+/* ---- Boutons d'ajout ---- */
+
+.pdc-add-domaine {
+    text-align: center;
+    margin-top: 40px;
+}
+
+/* ---- Drag & drop ---- */
+
+.pdc-projet.ui-sortable-helper {
+    opacity: 0.7;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.pdc-domaine.ui-sortable-helper {
+    opacity: 0.7;
+}
+
+/* ---- Modales ---- */
+
+.modal-header {
+    background-color: var(--pdc-primary);
+    color: #fff;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+.modal-header .close {
+    color: #fff;
+    opacity: 0.8;
+}
+
+.modal-header .close:hover {
+    opacity: 1;
+}
+
+/* ---- Tables ---- */
+
+.table > thead > tr > th {
+    background-color: var(--pdc-light);
+    font-weight: 600;
+    border-bottom: 2px solid #ddd;
+}
+
+/* ---- jQuery UI Datepicker ---- */
+
+#date_debut, #date_fin {
+    width:auto;
+}
+.pdc-datepicker,
+.gradient-date,
+.jalon-date {
+    cursor: pointer;
+}
+
+.ui-datepicker {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    z-index: 1000;
+}
+
+.ui-datepicker .ui-datepicker-header {
+    background-color: var(--pdc-primary);
+    color: #fff;
+    border-radius: 4px 4px 0 0;
+    padding: 8px;
+    border: none;
+}
+
+.ui-datepicker .ui-datepicker-prev,
+.ui-datepicker .ui-datepicker-next {
+    top: 5px;
+    cursor: pointer;
+    color: #fff;
+}
+
+.ui-datepicker .ui-datepicker-prev:hover,
+.ui-datepicker .ui-datepicker-next:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+
+.ui-datepicker th {
+    background-color: #f5f5f5;
+    color: #333;
+    font-weight: 600;
+    padding: 8px 0;
+    border: none;
+}
+
+.ui-datepicker td {
+    padding: 4px 0;
+}
+
+.ui-datepicker td > a,
+.ui-datepicker td > span {
+    display: block;
+    padding: 8px;
+    text-align: center;
+    text-decoration: none;
+    color: #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ui-datepicker td > a:hover {
+    background-color: var(--pdc-primary);
+    color: #fff;
+}
+
+.ui-datepicker .ui-datepicker-today a {
+    background-color: #e8f4f8;
+    border: 1px solid var(--pdc-info);
+}
+
+.ui-datepicker .ui-state-highlight a {
+    background-color: var(--pdc-info);
+    color: #fff;
+}
+
+.ui-datepicker .ui-state-disabled span {
+    color: #ccc;
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.ui-datepicker .ui-datepicker-buttonpane {
+    background-color: #f5f5f5;
+    border-top: 1px solid #ddd;
+    text-align: center;
+    padding: 8px;
+    border-radius: 0 0 4px 4px;
+}
+
+.ui-datepicker .ui-datepicker-buttonpane button {
+    background-color: var(--pdc-primary);
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 4px;
+}
+
+.ui-datepicker .ui-datepicker-buttonpane button:hover {
+    background-color: var(--pdc-secondary);
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 768px) {
+    .pdc-items-list {
+        grid-template-columns: 1fr;
+    }
+
+    .pdc-periode-form .form-group {
+        display: block;
+        margin-bottom: 10px;
+    }
+
+    .pdc-toolbar .text-right {
+        text-align: left;
+        margin-top: 15px;
+    }
+}
