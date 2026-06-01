@@ -17,32 +17,29 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
 </head>
 <body>
-<nav class="navbar navbar-default navbar-fixed-top pdc-navbar">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top pdc-navbar">
     <div class="container-fluid">
-        <div class="navbar-header">
-            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#pdc-nav">
-                <span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
-            </button>
-            <a class="navbar-brand" href="<?php echo APP_URL; ?>/index.php">
-                <i class="fa-regular fa-calendar-check"></i> <?php echo $pageTitle; ?>
-            </a>
-        </div>
+        <a class="navbar-brand" href="<?php echo APP_URL; ?>/index.php">
+            <i class="fa-regular fa-calendar-check"></i> <?php echo $pageTitle; ?>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#pdc-nav" aria-controls="pdc-nav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
         <div class="collapse navbar-collapse" id="pdc-nav">
             <?php if (!empty($currentUser)): ?>
-            <ul class="nav navbar-nav navbar-right">
-                <li><a href="<?php echo APP_URL; ?>/index.php"><i class="fa fa-home"></i> Plan de charge</a></li>
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item"><a class="nav-link" href="<?php echo APP_URL; ?>/index.php"><i class="fa-solid fa-house"></i> Plan de charge</a></li>
                 <?php if (!empty($isAdmin) || !empty($isResponsable)): ?>
-                <li><a href="<?php echo APP_URL; ?>/admin.php"><i class="fa fa-cog"></i> Administration</a></li>
+                <li class="nav-item"><a class="nav-link" href="<?php echo APP_URL; ?>/admin.php"><i class="fa-solid fa-gear"></i> Administration</a></li>
                 <?php endif; ?>
-                <li class="dropdown">
-                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                        <i class="fa fa-user"></i>
+                <li class="nav-item dropdown">
+                    <button class="btn dropdown-toggle" style="background-color: transparent; color: white;" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fa-solid fa-user"></i>
                         <?php echo htmlspecialchars($currentUser['displayname'], ENT_QUOTES, 'UTF-8'); ?>
-                        <span class="caret"></span>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a href="<?php echo APP_URL; ?>/logout.php"><i class="fa fa-sign-out"></i> Déconnexion</a></li>
-                    </ul>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <a href="<?php echo APP_URL; ?>/logout.php" class="dropdown-item"><i class="fa-solid fa-arrow-right-from-bracket"></i> Déconnexion</a>
+                    </div>
                 </li>
             </ul>
             <?php endif; ?>

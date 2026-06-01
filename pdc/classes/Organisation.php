@@ -107,6 +107,81 @@ class Organisation {
         );
     }
 
+    // ---- Création / Suppression Entreprises ----
+
+    public static function createEntreprise($nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM entreprises');
+        $ordre = $last ? (int)$last['m'] + 1 : 0;
+        return $db->insert(
+            'INSERT INTO entreprises (nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, 1)',
+            array(self::sanitize($nom), $ldapDn, $ordre)
+        );
+    }
+
+    public static function updateEntreprise($id, $nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        return $db->execute(
+            'UPDATE entreprises SET nom = ?, ldap_dn = ? WHERE id = ?',
+            array(self::sanitize($nom), $ldapDn, (int)$id)
+        );
+    }
+
+    public static function deleteEntreprise($id) {
+        $db = Database::getInstance();
+        return $db->execute('DELETE FROM entreprises WHERE id = ?', array((int)$id));
+    }
+
+    // ---- Création / Suppression Départements ----
+
+    public static function createDepartement($entrepriseId, $nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM departements WHERE entreprise_id = ?', array((int)$entrepriseId));
+        $ordre = $last ? (int)$last['m'] + 1 : 0;
+        return $db->insert(
+            'INSERT INTO departements (entreprise_id, nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, ?, 1)',
+            array((int)$entrepriseId, self::sanitize($nom), $ldapDn, $ordre)
+        );
+    }
+
+    public static function updateDepartement($id, $nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        return $db->execute(
+            'UPDATE departements SET nom = ?, ldap_dn = ? WHERE id = ?',
+            array(self::sanitize($nom), $ldapDn, (int)$id)
+        );
+    }
+
+    public static function deleteDepartement($id) {
+        $db = Database::getInstance();
+        return $db->execute('DELETE FROM departements WHERE id = ?', array((int)$id));
+    }
+
+    // ---- Création / Suppression Services ----
+
+    public static function createService($departementId, $nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM services WHERE departement_id = ?', array((int)$departementId));
+        $ordre = $last ? (int)$last['m'] + 1 : 0;
+        return $db->insert(
+            'INSERT INTO services (departement_id, nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, ?, 1)',
+            array((int)$departementId, self::sanitize($nom), $ldapDn, $ordre)
+        );
+    }
+
+    public static function updateService($id, $nom, $ldapDn = '') {
+        $db = Database::getInstance();
+        return $db->execute(
+            'UPDATE services SET nom = ?, ldap_dn = ? WHERE id = ?',
+            array(self::sanitize($nom), $ldapDn, (int)$id)
+        );
+    }
+
+    public static function deleteService($id) {
+        $db = Database::getInstance();
+        return $db->execute('DELETE FROM services WHERE id = ?', array((int)$id));
+    }
+
     // ---- Synchronisation LDAP → MySQL ----
 
     /**

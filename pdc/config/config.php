@@ -11,7 +11,7 @@ define('DB_PASS',     'pdc_user');
 define('DB_CHARSET',  'utf8mb4');
 
 // Mode Offline (pour développement/test)
-define('OFFLINE_MODE',     true);
+define('OFFLINE_MODE',     false);
 
 // LDAP
 define('LDAP_HOST',        '192.168.1.2');

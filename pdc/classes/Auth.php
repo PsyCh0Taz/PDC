@@ -111,12 +111,12 @@ class Auth {
     public static function loadRoles($username) {
         $db   = Database::getInstance();
         $rows = $db->fetchAll(
-            'SELECT scope_dn, role FROM user_roles WHERE username = ?',
+            'SELECT role_dn, role FROM utilisateurs_roles WHERE username = ?',
             array($username)
         );
         $roles = array();
         foreach ($rows as $row) {
-            $roles[$row['scope_dn']] = $row['role'];
+            $roles[$row['role_dn']] = $row['role'];
         }
         return $roles;
     }

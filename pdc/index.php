@@ -201,7 +201,7 @@ include __DIR__ . '/includes/header.php';
                             <div class="pdc-projet-header">
                                 <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
                                 <button class="btn btn-xs btn-link pdc-edit-projet" data-projet-id="<?php echo $projet['id']; ?>" title="Modifier le projet">
-                                    <i class="fa-regular fa-pen-to-square"></i>
+                                    <i class="fa-solid fa-square-pen"></i>
                                 </button>
                             </div>
                             <div class="pdc-frise-container">
@@ -216,7 +216,7 @@ include __DIR__ . '/includes/header.php';
                             </div>
                         </div>
                         <?php endforeach; ?>
-                        <div class="jjpdc-projet-placeholder"></div>
+                        <div></div>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -233,7 +233,7 @@ include __DIR__ . '/includes/header.php';
                 <?php if ($canModify): ?>
                 <div class="pdc-add-domaine">
                     <button class="btn btn-success btn-lg" id="btn-add-domaine">
-                        <i class="fa-solid fa-circle-plus"></i> Ajouter un domaine
+                        <i class="fa-regular fa-circle-plus"></i> Ajouter un domaine
                     </button>
                 </div>
                 <?php endif; ?>
@@ -460,6 +460,84 @@ var PDC = {
     currentProjetId: null,
     currentDomaineId: null,
 };
+
+// Création de projet - Convertir dates du format français (dd/mm/yyyy) au format ISO (yyyy-mm-dd)
+function convertDateToISO(dateStr) {
+    if (!dateStr) return '';
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr; // Déjà au format ISO
+    var parts = dateStr.split('/');
+    if (parts.length !== 3) return dateStr;
+    var day = parts[0];
+    var month = parts[1];
+    var year = parts[2];
+    if (year.length === 2) {
+        year = (year < 50) ? '20' + year : '19' + year;
+    }
+    return year + '-' + month + '-' + day;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Clic sur bouton "Ajouter un projet"
+    document.querySelectorAll('.pdc-add-projet').forEach(btn => {
+        btn.addEventListener('click', function() {
+            PDC.currentDomaineId = parseInt(this.dataset.domaineId);
+            // Réinitialiser le formulaire
+            document.getElementById('new-projet-titre').value = '';
+            document.getElementById('new-projet-date-debut').value = '';
+            document.getElementById('new-projet-date-fin').value = '';
+            // Afficher la modale
+            var modal = new bootstrap.Modal(document.getElementById('modal-add-projet'));
+            modal.show();
+        });
+    });
+
+    // Clic sur bouton "Enregistrer" dans la modale
+    var btnAddProjet = document.getElementById('btn-add-projet');
+    if (btnAddProjet) {
+        btnAddProjet.addEventListener('click', function() {
+            var titre = document.getElementById('new-projet-titre').value.trim();
+            var dateDebut = convertDateToISO(document.getElementById('new-projet-date-debut').value);
+            var dateFin = convertDateToISO(document.getElementById('new-projet-date-fin').value);
+
+            if (!titre || !dateDebut || !dateFin) {
+                alert('Veuillez remplir tous les champs');
+                return;
+            }
+
+            if (new Date(dateDebut) > new Date(dateFin)) {
+                alert('La date de début doit être antérieure à la date de fin');
+                return;
+            }
+
+            // Envoyer à l'API
+            var formData = new FormData();
+            formData.append('action', 'create_projet');
+            formData.append('domaine_id', PDC.currentDomaineId);
+            formData.append('titre', titre);
+            formData.append('date_debut', dateDebut);
+            formData.append('date_fin', dateFin);
+
+            fetch(PDC.appUrl + '/api.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Fermer la modale et recharger
+                    bootstrap.Modal.getInstance(document.getElementById('modal-add-projet')).hide();
+                    location.reload();
+                } else {
+                    alert('Erreur: ' + (data.error || 'Erreur inconnue'));
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                alert('Erreur lors de la création du projet');
+            });
+        });
+    }
+});
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
