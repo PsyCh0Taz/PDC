@@ -17,6 +17,7 @@ if (!$isAdmin && !$isResponsable) {
 }
 
 $pageTitle = 'Administration';
+
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'services';
 
 // Traiter les actions
@@ -32,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $service = Organisation::getServiceById($serviceId);
                 if ($service) {
                     $db = Database::getInstance();
-                    $db->update(
+                    $db->execute(
                         'UPDATE services SET actif = ? WHERE id = ?',
                         array($active, $serviceId)
                     );
@@ -106,9 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $filename = 'logo_' . time() . '.' . pathinfo($logo['name'], PATHINFO_EXTENSION);
                     if (move_uploaded_file($logo['tmp_name'], $uploadDir . $filename)) {
                         $db = Database::getInstance();
-                        $db->update(
+                        $db->execute(
                             'UPDATE parametres SET valeur = ? WHERE cle = ?',
-                            array('/assets/uploads/' . $filename, 'logo_url')
+                            array( '/assets/uploads/' . $filename, 'logo_url')
                         );
                         Journal::logModification(
                             $currentUser['username'],
@@ -123,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (!empty($titre)) {
                     $db = Database::getInstance();
-                    $db->update(
+                    $db->execute(
                         'UPDATE parametres SET valeur = ? WHERE cle = ?',
                         array($titre, 'titre_pdf')
                     );
@@ -193,12 +194,6 @@ $purgeMessage = null;
     </div>
     <?php endif; ?>
     
-    <div class="row pdc-admin-header">
-        <div class="col-md-12">
-            <h1><i class="fa-solid fa-cog"></i> Administration</h1>
-        </div>
-    </div>
-
     <!-- Onglets -->
     <ul class="nav nav-tabs pdc-admin-tabs" role="tablist">
         <li role="presentation" <?php echo $tab === 'services' ? 'class="active"' : ''; ?>>
@@ -227,7 +222,7 @@ $purgeMessage = null;
         <?php if ($tab === 'services'): ?>
         <div role="tabpanel" class="tab-pane active">
             <div class="pdc-admin-section">
-                <h2>Gestion des services</h2>
+                <h2>Gestion des hiérarchies</h2>
                 <p class="text-muted">Cochez ou décochez les services pour les activer/désactiver dans l'application.</p>
 
                 <div class="table-responsive pdc-services-list">
@@ -415,7 +410,7 @@ $purgeMessage = null;
                         <input type="file" class="form-control" id="logo" name="logo" accept="image/*" />
                         <?php if (!empty($parametres['logo_url'])): ?>
                             <div class="mt-2">
-                                <img src="<?php echo htmlspecialchars($parametres['logo_url'], ENT_QUOTES, 'UTF-8'); ?>" 
+                                <img src="<?php echo APP_URL . htmlspecialchars($parametres['logo_url'], ENT_QUOTES, 'UTF-8'); ?>" 
                                     class="img-thumbnail" style="max-height: 100px;" />
                             </div>
                         <?php endif; ?>

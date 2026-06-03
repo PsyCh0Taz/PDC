@@ -117,7 +117,7 @@
 }
 
 .pdc-container {
-    padding: 30px 15px;
+    padding: 10px 15px;
 }
 
 /* ---- Breadcrumb ---- */
@@ -127,7 +127,6 @@
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     padding: 15px 20px;
-    margin-bottom: 20px;
     font-size: 16px;
 }
 
@@ -145,6 +144,8 @@
 .pdc-breadcrumb a:hover {
     text-decoration: underline;
 }
+
+
 
 /* ---- Barre d'outils ---- */
 
@@ -729,7 +730,6 @@
 
 .tab-pane.active {
     display: block;
-}
     color: #fff;
     border-radius: 4px 4px 0 0;
     padding: 8px;

@@ -1,64 +1,77 @@
 <?php
 // ============================================================
-// PDC — Classe Organisation (domaines, services, départements, entreprises)
+// PDC — Classe Hierarchie
 // ============================================================
 
-class Organisation {
+class Hierarchie {
 
-    // ---- Entreprises ----
+    public static function getAll() {
+        $tArray = self::getSubLevel(0);
 
-    public static function getEntreprises() {
-        $db = Database::getInstance();
-        return $db->fetchAll('SELECT * FROM entreprises WHERE actif = 1 ORDER BY ordre ASC, nom ASC');
+        foreach ($tArray as &$item) {
+            $item['subItems'] = self::getSubLevel($item['id']);
+        }
+        return $tArray;
     }
 
-    public static function getAllEntreprises() {
+    public static function getSubLevel($hierarchieId) {
         $db = Database::getInstance();
-        return $db->fetchAll('SELECT * FROM entreprises ORDER BY ordre ASC, nom ASC');
-    }
-
-    public static function getEntrepriseById($id) {
-        $db = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM entreprises WHERE id = ?', array((int)$id));
-    }
-
-    // ---- Départements ----
-
-    public static function getDepartements($entrepriseId) {
-        $db = Database::getInstance();
-        return $db->fetchAll(
-            'SELECT * FROM departements WHERE entreprise_id = ? AND actif = 1 ORDER BY ordre ASC, nom ASC',
-            array((int)$entrepriseId)
+        $tArray = $db->fetchAll(
+            'SELECT * FROM hierarchie WHERE id_parent = ? ORDER BY ordre ASC, nom ASC',
+            array((int)$hierarchieId)
         );
-    }
-
-    public static function getDepartementById($id) {
+        foreach ($tArray as &$item) {
+            $item['subItems'] = self::getSubLevel($item['id']);
+        }
+        return $tArray;
+    }   
+    
+    public static function getLevel($hierarchieId) {
         $db = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM departements WHERE id = ?', array((int)$id));
-    }
-
-    // ---- Services ----
-
-    public static function getServices($departementId) {
-        $db = Database::getInstance();
-        return $db->fetchAll(
-            'SELECT * FROM services WHERE departement_id = ? AND actif = 1 ORDER BY ordre ASC, nom ASC',
-            array((int)$departementId)
+        $tArray = $db->fetchAll(
+            'SELECT * FROM hierarchie WHERE id = ?',
+            array((int)$hierarchieId)
         );
-    }
+        $tArray[0]['subItems'] = self::getSubLevel($hierarchieId);
+        return $tArray;
+    }   
 
-    public static function getServiceById($id) {
-        $db = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM services WHERE id = ?', array((int)$id));
-    }
 
+    public static function getUpperLevel($tree, $searchId, $path=array()){
+        if ($searchId === null) {
+            return null;
+        }
+        foreach ($tree as $node) {
+
+            $currentPath = $path;
+            $currentPath[] = $node;
+
+            if ($node['id'] == $searchId) {
+                return $currentPath;
+            }
+
+            if (!empty($node['subItems'])) {
+
+                $result = self::getUpperLevel(
+                    $node['subItems'],
+                    $searchId,
+                    $currentPath
+                );
+
+                if ($result !== null) {
+                    return $result;
+                }
+            }
+        }
+    return null;
+    }
     // ---- Domaines ----
 
-    public static function getDomainesByService($serviceId) {
+    public static function getDomainesByLevel($hierarchieId) {
         $db = Database::getInstance();
         return $db->fetchAll(
-            'SELECT * FROM domaines WHERE service_id = ? ORDER BY ordre ASC, nom ASC',
-            array((int)$serviceId)
+            'SELECT * FROM domaines WHERE hierarchie_id = ? ORDER BY ordre ASC, nom ASC',
+            array((int)$hierarchieId)
         );
     }
 

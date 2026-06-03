@@ -10,10 +10,11 @@ foreach ($currentUser['roles'] as $dn => $role) {
     if ($role === 'admin') $isAdmin = true;
     if ($role === 'responsable') $isResponsable = true;
 }
-
-// Niveau de navigation : entreprise / departement / service / domaine
-$niveau = isset($_GET['niveau']) ? $_GET['niveau'] : 'entreprise';
+$niveau = isset($_GET['niveau']) ? $_GET['niveau'] : '';
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : null;
+
+$tmpHierarchie=($id ? Hierarchie::getLevel($id) : Hierarchie::getAll());
+$tmpRevHierarchie=($id ? Hierarchie::getUpperLevel(Hierarchie::getAll(), $id) : null);
 
 // Période affichée
 $aujourdhui = new DateTime();
@@ -35,55 +36,22 @@ if ($moisCourant >= 1 && $moisCourant <= 4) {
 $dateDebut = isset($_GET['date_debut']) ? $_GET['date_debut'] : $quadStart;
 $dateFin   = isset($_GET['date_fin'])   ? $_GET['date_fin']   : $quadEnd;
 
-$pageTitle = 'Plan de Charge';
+
 
 // Breadcrumb
 $breadcrumb = array();
 $currentData = null;
 
-switch ($niveau) {
-    case 'entreprise':
-        $entreprises = Organisation::getEntreprises();
-        $currentData = array('type' => 'entreprises', 'items' => $entreprises);
-        $breadcrumb[] = array('label' => 'Entreprises', 'link' => '?niveau=entreprise');
-        break;
-
-    case 'departement':
-        if ($id) {
-            $entreprise = Organisation::getEntrepriseById($id);
-            $departements = Organisation::getDepartements($id);
-            $currentData = array('type' => 'departements', 'items' => $departements, 'parent' => $entreprise);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '?niveau=entreprise');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '?niveau=departement&id=' . $id);
-        }
-        break;
-
-    case 'service':
-        if ($id) {
-            $departement = Organisation::getDepartementById($id);
-            $entreprise  = Organisation::getEntrepriseById($departement['entreprise_id']);
-            $services    = Organisation::getServices($id);
-            $currentData = array('type' => 'services', 'items' => $services, 'parent' => $departement);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '?niveau=entreprise');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '?niveau=departement&id=' . $entreprise['id']);
-            $breadcrumb[] = array('label' => $departement['nom'], 'link' => '?niveau=service&id=' . $id);
-        }
-        break;
-
-    case 'domaine':
-        if ($id) {
-            $service     = Organisation::getServiceById($id);
-            $departement = Organisation::getDepartementById($service['departement_id']);
-            $entreprise  = Organisation::getEntrepriseById($departement['entreprise_id']);
-            $domaines    = Organisation::getDomainesByService($id);
-            $currentData = array('type' => 'domaines', 'items' => $domaines, 'parent' => $service);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '?niveau=entreprise');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '?niveau=departement&id=' . $entreprise['id']);
-            $breadcrumb[] = array('label' => $departement['nom'], 'link' => '?niveau=service&id=' . $departement['id']);
-            $breadcrumb[] = array('label' => $service['nom'], 'link' => '?niveau=domaine&id=' . $id);
-        }
-        break;
+$breadcrumb[] = array('label' => APP_NAME, 'link' => '?id=0');
+if ( $tmpRevHierarchie ) {
+    foreach( $tmpRevHierarchie as $item ) {
+        $breadcrumb[] = array(
+            'label' => $item['nom'],
+            'link'  => '?id=' . $item['id']
+        );
+    }
 }
+$pageTitle = "Plan de charge" . ( $id ? " - " . $tmpHierarchie[0]['nom'] : "" );
 
 include __DIR__ . '/includes/header.php';
 ?>
@@ -102,7 +70,6 @@ include __DIR__ . '/includes/header.php';
         <div class="row">
             <div class="col-md-6">
                 <form id="periode_form" method="get" class="form-inline pdc-periode-form">
-                    <input type="hidden" name="niveau" value="<?php echo htmlspecialchars($niveau, ENT_QUOTES, 'UTF-8'); ?>">
                     <?php if ($id): ?>
                     <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
                     <?php endif; ?>
@@ -126,13 +93,9 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
-
-    <!-- Affichage selon le niveau -->
     <div class="pdc-content" id="pdc-content">
-        <?php if ($currentData && $currentData['type'] === 'entreprises'): ?>
-            <!-- Liste des entreprises -->
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
+        <div class="pdc-items-list">
+                <?php foreach ( $tmpHierarchie[0]['subItems'] as $item): ?>
                 <div class="pdc-card">
                     <h3>
                         <a href="?niveau=departement&id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
@@ -142,103 +105,72 @@ include __DIR__ . '/includes/header.php';
                     </h3>
                 </div>
                 <?php endforeach; ?>
-            </div>
+        </div>
 
-        <?php elseif ($currentData && $currentData['type'] === 'departements'): ?>
-            <!-- Liste des départements -->
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
-                <div class="pdc-card">
-                    <h3>
-                        <a href="?niveau=service&id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
-                            <i class="fa-solid fa-sitemap"></i>
-                            <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?>
-                        </a>
+        <div id="domaines-container" class="pdc-domaines-container">
+            <?php 
+                $domainesList = Hierarchie::getDomainesByLevel($id);
+                foreach ($domainesList as $domaine):
+                $projets = Projet::getByDomaine($domaine['id']);
+            ?>
+            <div class="pdc-domaine" data-domaine-id="<?php echo $domaine['id']; ?>">
+                <div class="pdc-domaine-header">
+                    <h3 class="pdc-domaine-titre">
+                        <?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?>
+                        <button class="btn btn-xs btn-link pdc-edit-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" title="Modifier le titre">
+                            <i class="fa-solid fa-square-pen"></i>
+                        </button>
+                        <button class="btn btn-xs btn-link pdc-add-projet" data-domaine-id="<?php echo $domaine['id']; ?>" title="Ajouter un projet">
+                            <i class="fa-solid fa-square-plus"></i>
+                        </button>                            
                     </h3>
                 </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php elseif ($currentData && $currentData['type'] === 'services'): ?>
-            <!-- Liste des services -->
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
-                <div class="pdc-card">
-                    <h3>
-                        <a href="?niveau=domaine&id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
-                            <i class="fa-solid fa-briefcase"></i>
-                            <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?>
-                        </a>
-                    </h3>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php elseif ($currentData && $currentData['type'] === 'domaines'): ?>
-            <!-- Domaines et projets -->
-            <div id="domaines-container" class="pdc-domaines-container">
-                <?php foreach ($currentData['items'] as $domaine):
-                    $projets = Projet::getByDomaine($domaine['id']);
-                ?>
-                <div class="pdc-domaine" data-domaine-id="<?php echo $domaine['id']; ?>">
-                    <div class="pdc-domaine-header">
-                        <h3 class="pdc-domaine-titre">
-                            <?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?>
-                            <button class="btn btn-xs btn-link pdc-edit-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" title="Modifier le titre">
+                <div class="pdc-projets-list" data-domaine-id="<?php echo $domaine['id']; ?>">
+                    <?php foreach ($projets as $projet):
+                        $gradients = Projet::getGradients($projet['id']);
+                        $jalons    = Projet::getJalons($projet['id']);
+                    ?>
+                    <div class="pdc-projet" data-projet-id="<?php echo $projet['id']; ?>">
+                        <div class="pdc-projet-header">
+                            <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <button class="btn btn-xs btn-link pdc-edit-projet" data-projet-id="<?php echo $projet['id']; ?>" title="Modifier le projet">
                                 <i class="fa-solid fa-square-pen"></i>
                             </button>
-                            <button class="btn btn-xs btn-link pdc-add-projet" data-domaine-id="<?php echo $domaine['id']; ?>" title="Ajouter un projet">
-                                <i class="fa-solid fa-square-plus"></i>
-                            </button>                            
-                        </h3>
-                    </div>
-                    <div class="pdc-projets-list" data-domaine-id="<?php echo $domaine['id']; ?>">
-                        <?php foreach ($projets as $projet):
-                            $gradients = Projet::getGradients($projet['id']);
-                            $jalons    = Projet::getJalons($projet['id']);
-                        ?>
-                        <div class="pdc-projet" data-projet-id="<?php echo $projet['id']; ?>">
-                            <div class="pdc-projet-header">
-                                <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
-                                <button class="btn btn-xs btn-link pdc-edit-projet" data-projet-id="<?php echo $projet['id']; ?>" title="Modifier le projet">
-                                    <i class="fa-solid fa-square-pen"></i>
-                                </button>
-                            </div>
-                            <div class="pdc-frise-container">
-                                <div class="pdc-frise" data-projet-id="<?php echo $projet['id']; ?>"
-                                     data-date-debut="<?php echo $projet['date_debut']; ?>"
-                                     data-date-fin="<?php echo $projet['date_fin']; ?>"
-                                     data-periode-debut="<?php echo $dateDebut; ?>"
-                                     data-periode-fin="<?php echo $dateFin; ?>"
-                                     data-gradients='<?php echo json_encode($gradients); ?>'
-                                     data-jalons='<?php echo json_encode($jalons); ?>'>
-                                </div>
+                        </div>
+                        <div class="pdc-frise-container">
+                            <div class="pdc-frise" data-projet-id="<?php echo $projet['id']; ?>"
+                                    data-date-debut="<?php echo $projet['date_debut']; ?>"
+                                    data-date-fin="<?php echo $projet['date_fin']; ?>"
+                                    data-periode-debut="<?php echo $dateDebut; ?>"
+                                    data-periode-fin="<?php echo $dateFin; ?>"
+                                    data-gradients='<?php echo json_encode($gradients); ?>'
+                                    data-jalons='<?php echo json_encode($jalons); ?>'>
                             </div>
                         </div>
-                        <?php endforeach; ?>
-                        <div></div>
                     </div>
+                    <?php endforeach; ?>
+                    <div></div>
                 </div>
-                <?php endforeach; ?>
-
-                <!-- Bouton ajouter un domaine -->
-                <?php
-                // Vérifier si l'utilisateur peut modifier
-                $canModify = false;
-                if ($isAdmin) $canModify = true;
-                elseif (isset($currentData['parent']['ldap_dn'])) {
-                    $canModify = Auth::hasRole($currentUser['roles'], $currentData['parent']['ldap_dn'], 'modificateur');
-                }
-                ?>
-                <?php if ($canModify): ?>
-                <div class="pdc-add-domaine">
-                    <button class="btn btn-success btn-lg" id="btn-add-domaine">
-                        <i class="fa-regular fa-circle-plus"></i> Ajouter un domaine
-                    </button>
-                </div>
-                <?php endif; ?>
             </div>
-        <?php endif; ?>
+            <?php endforeach; ?>
+
+            <!-- Bouton ajouter un domaine -->
+            <?php
+            // Vérifier si l'utilisateur peut modifier
+            $canModify = false;
+            if ($isAdmin) $canModify = true;
+            elseif (isset($currentData['parent']['ldap_dn'])) {
+                $canModify = Auth::hasRole($currentUser['roles'], $currentData['parent']['ldap_dn'], 'modificateur');
+            }
+            ?>
+            <?php if ($canModify): ?>
+            <div class="pdc-add-domaine">
+                <button class="btn btn-success btn-lg" id="btn-add-domaine">
+                    <i class="fa-solid fa-circle-plus"></i> Ajouter un domaine
+                </button>
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
 
 </div>
@@ -539,5 +471,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-
 <?php include __DIR__ . '/includes/footer.php'; ?>

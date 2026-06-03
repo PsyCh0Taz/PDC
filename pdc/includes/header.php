@@ -22,9 +22,6 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
         <a class="navbar-brand" href="<?php echo APP_URL; ?>/index.php">
             <i class="fa-regular fa-calendar-check"></i> <?php echo $pageTitle; ?>
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#pdc-nav" aria-controls="pdc-nav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
         <div class="collapse navbar-collapse" id="pdc-nav">
             <?php if (!empty($currentUser)): ?>
             <ul class="navbar-nav ms-auto">
