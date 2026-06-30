@@ -148,7 +148,10 @@
                 
                 var $week = $('<div class="pdc-week-label"></div>');
                 $week.css('left', weekOffset + '%');
-                $week.html('S' + weekNum + "/" + year.toString().substr(2,2) + (currentDate.getDay() != 1 ? "" : "<br>" + currentDate.getDate() + "/" + (currentDate.getMonth() + 1)));
+                var weekNum2 = ('0' + weekNum).slice(-2);
+                var day2 = ('0' + currentDate.getDate()).slice(-2);
+                var month2 = ('0' + (currentDate.getMonth() + 1)).slice(-2);
+                $week.html('S' + weekNum2 + "/" + year.toString().substr(2,2) + (currentDate.getDay() != 1 ? "" : "<br>" + day2 + "/" + month2));
                 $week.attr('title', 'Semaine ' + weekNum + ' - ' + year);
                 $weeksContainer.append($week);
             }
@@ -373,31 +376,94 @@
         $('.pdc-projets-list').sortable({
             connectWith: '.pdc-projets-list',
             handle: '.pdc-projet-header',
+            cancel: '.pdc-edit-projet, button, input, select, textarea, a',
             placeholder: 'pdc-projet-placeholder',
-            update: function(event, ui) {
+            tolerance: 'pointer',
+            distance: 5,
+            start: function(event, ui) {
+                var $item = ui.item;
+                $item.data('old-domaine-id', parseInt($item.parent().data('domaine-id') || 0, 10));
+                $item.data('old-index', $item.index());
+            },
+            stop: function(event, ui) {
+                var $item = ui.item;
                 var projetId = ui.item.data('projet-id');
-                var newDomaineId = ui.item.closest('.pdc-projets-list').data('domaine-id');
-                
-                // Réorganiser les ordres
-                var ordres = {};
-                ui.item.closest('.pdc-projets-list').find('.pdc-projet').each(function(idx) {
-                    ordres[$(this).data('projet-id')] = idx;
+                var $newList = ui.item.closest('.pdc-projets-list');
+                var newDomaineId = parseInt($newList.data('domaine-id') || 0, 10);
+
+                var oldDomaineId = parseInt($item.data('old-domaine-id') || 0, 10);
+                var oldIndex = parseInt($item.data('old-index') || 0, 10);
+                var newIndex = $item.index();
+
+                if (oldDomaineId === newDomaineId && oldIndex === newIndex) {
+                    return;
+                }
+
+                // Réorganiser les ordres du domaine cible
+                var ordresCible = {};
+                $newList.find('.pdc-projet').each(function(idx) {
+                    ordresCible[$(this).data('projet-id')] = idx;
                 });
 
                 // Si changement de domaine
-                var oldDomaineId = ui.sender ? ui.sender.data('domaine-id') : newDomaineId;
-                if (oldDomaineId != newDomaineId) {
-                    $.post(PDC.appUrl + '/api.php', {
+                if (oldDomaineId !== newDomaineId) {
+                    $.ajax({
+                        url: PDC.appUrl + '/api.php',
+                        method: 'POST',
+                        dataType: 'json',
+                        data: {
                         action: 'move_projet',
                         projet_id: projetId,
-                        domaine_id: newDomaineId,
+                        domaine_id: newDomaineId
+                        }
+                    }).done(function(moveData) {
+                        if (!moveData || !moveData.success) {
+                            alert('Erreur de déplacement : ' + (moveData && moveData.error ? moveData.error : 'Erreur inconnue'));
+                            location.reload();
+                            return;
+                        }
+
+                        $.ajax({
+                            url: PDC.appUrl + '/api.php',
+                            method: 'POST',
+                            dataType: 'json',
+                            data: {
+                                action: 'reorder_projets',
+                                ordres: ordresCible
+                            }
+                        }).done(function(reorderData) {
+                            if (!reorderData || !reorderData.success) {
+                                alert('Erreur de réorganisation : ' + (reorderData && reorderData.error ? reorderData.error : 'Erreur inconnue'));
+                                location.reload();
+                            }
+                        }).fail(function() {
+                            alert('Erreur de réorganisation des projets.');
+                            location.reload();
+                        });
+                    }).fail(function() {
+                        alert('Erreur de déplacement du projet.');
+                        location.reload();
                     });
+                    return;
                 }
 
-                // Enregistrer les ordres
-                $.post(PDC.appUrl + '/api.php', {
-                    action: 'reorder_projets',
-                    ordres: ordres,
+                // Même domaine: simple réorganisation
+                $.ajax({
+                    url: PDC.appUrl + '/api.php',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'reorder_projets',
+                        ordres: ordresCible
+                    }
+                }).done(function(reorderData) {
+                    if (!reorderData || !reorderData.success) {
+                        alert('Erreur de réorganisation : ' + (reorderData && reorderData.error ? reorderData.error : 'Erreur inconnue'));
+                        location.reload();
+                    }
+                }).fail(function() {
+                    alert('Erreur de réorganisation des projets.');
+                    location.reload();
                 });
             }
         });
@@ -406,14 +472,41 @@
         $('#domaines-container').sortable({
             items: '.pdc-domaine',
             handle: '.pdc-domaine-header',
-            update: function(event, ui) {
+            cancel: '.pdc-edit-domaine, .pdc-add-projet, button, input, select, textarea, a',
+            tolerance: 'pointer',
+            distance: 5,
+            start: function(event, ui) {
+                var $item = ui.item;
+                $item.data('old-index', $item.index());
+            },
+            stop: function(event, ui) {
+                var $item = ui.item;
+                var oldIndex = parseInt($item.data('old-index') || 0, 10);
+                var newIndex = $item.index();
+                if (oldIndex === newIndex) {
+                    return;
+                }
+
                 var ordres = {};
                 $('#domaines-container .pdc-domaine').each(function(idx) {
                     ordres[$(this).data('domaine-id')] = idx;
                 });
-                $.post(PDC.appUrl + '/api.php', {
-                    action: 'reorder_domaines',
-                    ordres: ordres,
+                $.ajax({
+                    url: PDC.appUrl + '/api.php',
+                    method: 'POST',
+                    dataType: 'json',
+                    data: {
+                        action: 'reorder_domaines',
+                        ordres: ordres
+                    }
+                }).done(function(data) {
+                    if (!data || !data.success) {
+                        alert('Erreur de réorganisation : ' + (data && data.error ? data.error : 'Erreur inconnue'));
+                        location.reload();
+                    }
+                }).fail(function() {
+                    alert('Erreur de réorganisation des domaines.');
+                    location.reload();
                 });
             }
         });
@@ -431,21 +524,34 @@
             
             PDC.currentDomaineId = domaineId;
             $('#domaine-nom').val(nom);
+            $('#domaine-hierarchie-id').val(String(parseInt(PDC.hierarchieId, 10) || ''));
             $('#modal-edit-domaine').modal('show');
         });
 
         $('#btn-save-domaine').on('click', function() {
             var nom = $('#domaine-nom').val().trim();
+            var hierarchieId = parseInt($('#domaine-hierarchie-id').val(), 10);
+            var currentHierarchieId = parseInt(PDC.hierarchieId, 10);
+            var hasMoved = !isNaN(currentHierarchieId) && currentHierarchieId > 0 && currentHierarchieId !== hierarchieId;
+            var selectedHierarchyLabel = $('#domaine-hierarchie-id option:selected').text().replace(/\s+/g, ' ').trim();
             if (!nom) {
                 alert('Le nom est requis.');
+                return;
+            }
+            if (isNaN(hierarchieId) || hierarchieId <= 0) {
+                alert('Le niveau hiérarchique est requis.');
                 return;
             }
             $.post(PDC.appUrl + '/api.php', {
                 action: 'update_domaine',
                 id: PDC.currentDomaineId,
                 nom: nom,
+                hierarchie_id: hierarchieId,
             }, function(data) {
                 if (data.success) {
+                    if (hasMoved) {
+                        alert('Domaine déplacé vers le niveau : ' + selectedHierarchyLabel);
+                    }
                     location.reload();
                 } else {
                     alert('Erreur : ' + data.error);
@@ -475,13 +581,21 @@
 
         $('#btn-create-domaine').on('click', function() {
             var nom = $('#new-domaine-nom').val().trim();
+            var currentHierarchieId = parseInt($('#btn-add-domaine').data('hierarchie-id'), 10);
+            if (isNaN(currentHierarchieId)) {
+                currentHierarchieId = parseInt(PDC.hierarchieId, 10);
+            }
             if (!nom) {
                 alert('Le nom est requis.');
                 return;
             }
+            if (isNaN(currentHierarchieId) || currentHierarchieId <= 0) {
+                alert('Sélectionnez un niveau de hiérarchie avant de créer un domaine.');
+                return;
+            }
             $.post(PDC.appUrl + '/api.php', {
                 action: 'create_domaine',
-                service_id: PDC.serviceId,
+                hierarchie_id: currentHierarchieId,
                 nom: nom,
             }, function(data) {
                 if (data.success) {
@@ -512,8 +626,10 @@
             }
             $.post(PDC.appUrl + '/api.php', {
                 action: 'create_projet',
-                domaine_id: PDC.serviceId,
-                nom: nom,
+                domaine_id: PDC.currentDomaineId,
+                titre: titre,
+                date_debut: dateDebut,
+                date_fin: dateFin,
             }, function(data) {
                 if (data.success) {
                     location.reload();
@@ -761,8 +877,11 @@
     function initToolbar() {
         // Générer un lien de partage
         $('#btn-share').on('click', function() {
-            var params = 'niveau=' + PDC.niveau;
-            if (PDC.id) params += '&id=' + PDC.id;
+            if (!PDC.id || parseInt(PDC.id, 10) <= 0) {
+                alert('Sélectionnez un niveau de hiérarchie à partager.');
+                return;
+            }
+            var params = 'niveau=hierarchie&id=' + PDC.id;
             params += '&date_debut=' + PDC.dateDebut + '&date_fin=' + PDC.dateFin;
 
             $.post(PDC.appUrl + '/api.php', {
@@ -790,8 +909,11 @@
 
         // Export PDF
         $('#btn-export-pdf').on('click', function() {
-            var params = 'niveau=' + PDC.niveau;
-            if (PDC.id) params += '&id=' + PDC.id;
+            if (!PDC.id || parseInt(PDC.id, 10) <= 0) {
+                alert('Sélectionnez un niveau de hiérarchie à exporter.');
+                return;
+            }
+            var params = 'niveau=hierarchie&id=' + PDC.id;
             params += '&date_debut=' + PDC.dateDebut + '&date_fin=' + PDC.dateFin;
             window.open(PDC.appUrl + '/export_pdf.php?' + params, '_blank');
         });

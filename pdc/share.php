@@ -1,187 +1,121 @@
 <?php
 require_once __DIR__ . '/includes/bootstrap.php';
 
-// Récupérer le token
 $token = isset($_GET['token']) ? $_GET['token'] : '';
-if (empty($token)) {
+if ($token === '') {
+    http_response_code(400);
     die('Token invalide.');
 }
 
 $link = ShareLink::getByToken($token);
 if (!$link) {
-    die('Lien de partage introuvable ou expiré.');
+    http_response_code(404);
+    die('Lien de partage introuvable ou expire.');
 }
 
-// Authentification requise
 $currentUser = Auth::requireLogin();
 
-// Journaliser l'accès
-Journal::logConnexion($currentUser['username'], Journal::getIp(), true, $token);
-
-// Décoder les paramètres URL
+$params = array();
 parse_str($link['url_params'], $params);
 
-$niveau    = isset($params['niveau']) ? $params['niveau'] : 'entreprise';
-$id        = isset($params['id']) ? (int)$params['id'] : null;
+$hierarchieId = isset($params['id']) ? (int)$params['id'] : 0;
 $dateDebut = isset($params['date_debut']) ? $params['date_debut'] : date('Y-01-01');
-$dateFin   = isset($params['date_fin']) ? $params['date_fin'] : date('Y-12-31');
+$dateFin = isset($params['date_fin']) ? $params['date_fin'] : date('Y-12-31');
 
-// Forcer le mode lecture seule
-$readOnly = true;
-$isAdmin = false;
-$isResponsable = false;
-
-// Charger les données (copier la logique de index.php)
-$breadcrumb = array();
-$currentData = null;
-
-switch ($niveau) {
-    case 'entreprise':
-        $entreprises = Organisation::getEntreprises();
-        $currentData = array('type' => 'entreprises', 'items' => $entreprises);
-        $breadcrumb[] = array('label' => 'Entreprises', 'link' => '#');
-        break;
-
-    case 'departement':
-        if ($id) {
-            $entreprise = Organisation::getEntrepriseById($id);
-            $departements = Organisation::getDepartements($id);
-            $currentData = array('type' => 'departements', 'items' => $departements, 'parent' => $entreprise);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '#');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '#');
-        }
-        break;
-
-    case 'service':
-        if ($id) {
-            $departement = Organisation::getDepartementById($id);
-            $entreprise  = Organisation::getEntrepriseById($departement['entreprise_id']);
-            $services    = Organisation::getServices($id);
-            $currentData = array('type' => 'services', 'items' => $services, 'parent' => $departement);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '#');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '#');
-            $breadcrumb[] = array('label' => $departement['nom'], 'link' => '#');
-        }
-        break;
-
-    case 'domaine':
-        if ($id) {
-            $service     = Organisation::getServiceById($id);
-            $departement = Organisation::getDepartementById($service['departement_id']);
-            $entreprise  = Organisation::getEntrepriseById($departement['entreprise_id']);
-            $domaines    = Organisation::getDomainesByService($id);
-            $currentData = array('type' => 'domaines', 'items' => $domaines, 'parent' => $service);
-            $breadcrumb[] = array('label' => 'Entreprises', 'link' => '#');
-            $breadcrumb[] = array('label' => $entreprise['nom'], 'link' => '#');
-            $breadcrumb[] = array('label' => $departement['nom'], 'link' => '#');
-            $breadcrumb[] = array('label' => $service['nom'], 'link' => '#');
-        }
-        break;
+if ($hierarchieId <= 0) {
+    http_response_code(400);
+    die('Niveau de hirarchie invalide.');
 }
 
-$pageTitle = 'Plan de Charge (lecture seule)';
+$roleRank = array(
+    'lecteur' => 1,
+    'modificateur' => 2,
+);
+
+$scope = 'hierarchie:' . $hierarchieId;
+$currentRole = isset($currentUser['roles'][$scope]) ? $currentUser['roles'][$scope] : null;
+$canRead = ($currentRole !== null && isset($roleRank[$currentRole]) && $roleRank[$currentRole] >= 1);
+
+if (!$canRead) {
+    http_response_code(403);
+    die('Acces refuse. Vous ne pouvez pas consulter ce niveau.');
+}
+
+$level = Hierarchie::getById($hierarchieId, false);
+if (!$level) {
+    http_response_code(404);
+    die('Niveau de hierarchie introuvable.');
+}
+
+Journal::logConnexion($currentUser['username'], Journal::getIp(), true, $token);
+
+$domaines = Hierarchie::getDomainesByLevel($hierarchieId);
+
+$pageTitle = 'Plan de Charge (lecture seule) - ' . $level['nom'];
+$isAdmin = false;
 include __DIR__ . '/includes/header.php';
 ?>
 
 <div class="container-fluid pdc-container">
-
-    <div class="alert alert-info">
-        <i class="fa fa-info-circle"></i>
-        <strong>Mode lecture seule.</strong> Vous consultez un lien de partage. Aucune modification n'est possible.
+    <div class="alert alert-info" role="alert">
+        <i class="fa-solid fa-circle-info"></i>
+        <strong>Mode lecture seule.</strong> Aucun ajout, modification ou suppression n'est autorise.
     </div>
 
-    <!-- Breadcrumb -->
-    <ol class="breadcrumb pdc-breadcrumb">
-        <?php foreach ($breadcrumb as $b): ?>
-            <li><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></li>
-        <?php endforeach; ?>
-    </ol>
-
-    <!-- Période -->
     <div class="pdc-toolbar">
-        <div class="row">
-            <div class="col-md-12">
-                <p><strong>Période affichée :</strong> du <?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?> au <?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?></p>
+        <p><strong>Niveau:</strong> <?php echo htmlspecialchars($level['nom'], ENT_QUOTES, 'UTF-8'); ?></p>
+        <p><strong>Periode:</strong> du <?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?> au <?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+
+    <div id="domaines-container" class="pdc-domaines-container">
+        <?php foreach ($domaines as $domaine): ?>
+        <?php $projets = Projet::getByDomaine($domaine['id']); ?>
+        <div class="pdc-domaine" data-domaine-id="<?php echo (int)$domaine['id']; ?>">
+            <div class="pdc-domaine-header">
+                <h3 class="pdc-domaine-titre"><?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?></h3>
+            </div>
+            <div class="pdc-projets-list" data-domaine-id="<?php echo (int)$domaine['id']; ?>">
+                <?php foreach ($projets as $projet): ?>
+                <?php
+                    $gradients = Projet::getGradients($projet['id']);
+                    $jalons = Projet::getJalons($projet['id']);
+                ?>
+                <div class="pdc-projet" data-projet-id="<?php echo (int)$projet['id']; ?>">
+                    <div class="pdc-projet-header">
+                        <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <span class="badge bg-secondary pdc-projet-periode-badge">
+                            <?php echo htmlspecialchars(Helper::formatDate($projet['date_debut']), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars(Helper::formatDate($projet['date_fin']), ENT_QUOTES, 'UTF-8'); ?>
+                        </span>
+                    </div>
+                    <div class="pdc-frise-container">
+                        <div class="pdc-frise"
+                             data-projet-id="<?php echo (int)$projet['id']; ?>"
+                             data-date-debut="<?php echo htmlspecialchars($projet['date_debut'], ENT_QUOTES, 'UTF-8'); ?>"
+                             data-date-fin="<?php echo htmlspecialchars($projet['date_fin'], ENT_QUOTES, 'UTF-8'); ?>"
+                             data-periode-debut="<?php echo htmlspecialchars($dateDebut, ENT_QUOTES, 'UTF-8'); ?>"
+                             data-periode-fin="<?php echo htmlspecialchars($dateFin, ENT_QUOTES, 'UTF-8'); ?>"
+                             data-gradients='<?php echo json_encode($gradients); ?>'
+                             data-jalons='<?php echo json_encode($jalons); ?>'>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
         </div>
+        <?php endforeach; ?>
     </div>
-
-    <!-- Affichage selon le niveau (copie de index.php sans les boutons d'édition) -->
-    <div class="pdc-content" id="pdc-content">
-        <?php if ($currentData && $currentData['type'] === 'entreprises'): ?>
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
-                <div class="pdc-card">
-                    <h3><i class="fa fa-building-o"></i> <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?></h3>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php elseif ($currentData && $currentData['type'] === 'departements'): ?>
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
-                <div class="pdc-card">
-                    <h3><i class="fa fa-sitemap"></i> <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?></h3>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php elseif ($currentData && $currentData['type'] === 'services'): ?>
-            <div class="pdc-items-list">
-                <?php foreach ($currentData['items'] as $item): ?>
-                <div class="pdc-card">
-                    <h3><i class="fa fa-briefcase"></i> <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?></h3>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php elseif ($currentData && $currentData['type'] === 'domaines'): ?>
-            <div id="domaines-container" class="pdc-domaines-container">
-                <?php foreach ($currentData['items'] as $domaine):
-                    $projets = Projet::getByDomaine($domaine['id']);
-                ?>
-                <div class="pdc-domaine">
-                    <div class="pdc-domaine-header">
-                        <h3 class="pdc-domaine-titre"><?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?></h3>
-                    </div>
-                    <div class="pdc-projets-list">
-                        <?php foreach ($projets as $projet):
-                            $gradients = Projet::getGradients($projet['id']);
-                            $jalons    = Projet::getJalons($projet['id']);
-                        ?>
-                        <div class="pdc-projet">
-                            <div class="pdc-projet-header">
-                                <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
-                            </div>
-                            <div class="pdc-frise-container">
-                                <div class="pdc-frise"
-                                     data-date-debut="<?php echo $projet['date_debut']; ?>"
-                                     data-date-fin="<?php echo $projet['date_fin']; ?>"
-                                     data-periode-debut="<?php echo $dateDebut; ?>"
-                                     data-periode-fin="<?php echo $dateFin; ?>"
-                                     data-gradients='<?php echo json_encode($gradients); ?>'
-                                     data-jalons='<?php echo json_encode($jalons); ?>'>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-
 </div>
 
 <script>
 var PDC = {
     appUrl: '<?php echo APP_URL; ?>',
-    niveau: '<?php echo htmlspecialchars($niveau, ENT_QUOTES, 'UTF-8'); ?>',
-    id: <?php echo $id ? (int)$id : 'null'; ?>,
+    id: <?php echo (int)$hierarchieId; ?>,
     dateDebut: '<?php echo htmlspecialchars($dateDebut, ENT_QUOTES, 'UTF-8'); ?>',
     dateFin: '<?php echo htmlspecialchars($dateFin, ENT_QUOTES, 'UTF-8'); ?>',
-    readOnly: true,
+    hierarchieId: <?php echo (int)$hierarchieId; ?>,
+    currentProjetId: null,
+    currentDomaineId: null,
+    readOnly: true
 };
 </script>
 

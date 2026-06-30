@@ -126,9 +126,6 @@ class Auth {
      * (recherche dans les ancêtres si pas de rôle direct)
      */
     public static function getRoleForDn($userRoles, $dn) {
-        // Administrateur global ?
-        if (isset($userRoles['*'])) return 'admin';
-
         // Rôle direct
         if (isset($userRoles[$dn])) return $userRoles[$dn];
 
@@ -148,7 +145,7 @@ class Auth {
      * Vérifie si l'utilisateur a au minimum un rôle sur un DN
      */
     public static function hasRole($userRoles, $dn, $minRole) {
-        $hierarchy = array('lecteur'=>1, 'modificateur'=>2, 'responsable'=>3, 'admin'=>4);
+        $hierarchy = array('lecteur'=>1, 'modificateur'=>2);
         $role = self::getRoleForDn($userRoles, $dn);
         if (!$role) return false;
         $min = isset($hierarchy[$minRole]) ? $hierarchy[$minRole] : 99;
@@ -256,6 +253,59 @@ class Auth {
                 'mail'        => isset($e['mail'][0]) ? $e['mail'][0] : '',
             );
         }
+        return $users;
+    }
+
+    /**
+     * Recherche des utilisateurs LDAP par login, nom ou e-mail.
+     */
+    public static function searchUsers($query, $limit = 20) {
+        $query = trim((string)$query);
+        if ($query === '') {
+            return array();
+        }
+
+        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
+        if (!$ldap) return array();
+
+        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
+        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
+
+        if (!@ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS)) {
+            ldap_close($ldap);
+            return array();
+        }
+
+        $safe = ldap_escape($query, '', LDAP_ESCAPE_FILTER);
+        $filter = '(&(objectClass=person)(|(uid=*' . $safe . '*)(sAMAccountName=*' . $safe . '*)(cn=*' . $safe . '*)(displayName=*' . $safe . '*)(mail=*' . $safe . '*)))';
+        $search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn','cn','uid','sAMAccountName','displayName','mail'), 0, (int)$limit);
+        if (!$search) {
+            ldap_close($ldap);
+            return array();
+        }
+
+        $entries = ldap_get_entries($ldap, $search);
+        ldap_close($ldap);
+
+        $users = array();
+        for ($i = 0; $i < $entries['count']; $i++) {
+            $e = $entries[$i];
+            $uid = '';
+            if (!empty($e['uid'][0])) $uid = $e['uid'][0];
+            elseif (!empty($e['samaccountname'][0])) $uid = $e['samaccountname'][0];
+
+            if ($uid === '' || empty($e['dn'])) {
+                continue;
+            }
+
+            $users[] = array(
+                'username' => $uid,
+                'dn' => $e['dn'],
+                'displayname' => !empty($e['displayname'][0]) ? $e['displayname'][0] : (!empty($e['cn'][0]) ? $e['cn'][0] : $uid),
+                'email' => !empty($e['mail'][0]) ? $e['mail'][0] : '',
+            );
+        }
+
         return $users;
     }
 

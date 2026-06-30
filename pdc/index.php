@@ -5,16 +5,71 @@ $currentUser = Auth::requireLogin();
 
 // Déterminer si admin ou responsable
 $isAdmin = false;
-$isResponsable = false;
 foreach ($currentUser['roles'] as $dn => $role) {
-    if ($role === 'admin') $isAdmin = true;
-    if ($role === 'responsable') $isResponsable = true;
+    if ($dn === '*' && $role === 'admin') $isAdmin = true;
 }
-$niveau = isset($_GET['niveau']) ? $_GET['niveau'] : '';
-$id     = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$roleRank = array('lecteur' => 1, 'modificateur' => 2);
+$id     = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 $tmpHierarchie=($id ? Hierarchie::getLevel($id) : Hierarchie::getAll());
 $tmpRevHierarchie=($id ? Hierarchie::getUpperLevel(Hierarchie::getAll(), $id) : null);
+
+if ($id && empty($tmpHierarchie)) {
+    $id = 0;
+    $tmpHierarchie = Hierarchie::getAll();
+    $tmpRevHierarchie = null;
+}
+
+$hierarchieItems = $id
+    ? (!empty($tmpHierarchie[0]['subItems']) ? $tmpHierarchie[0]['subItems'] : array())
+    : $tmpHierarchie;
+
+$currentLevelScope = $id > 0 ? ('hierarchie:' . $id) : null;
+$currentLevelRole = ($id > 0 && isset($currentUser['roles'][$currentLevelScope])) ? $currentUser['roles'][$currentLevelScope] : null;
+$canReadCurrentLevel = ($id > 0) && (
+    ($currentLevelRole !== null && isset($roleRank[$currentLevelRole]) && $roleRank[$currentLevelRole] >= 1)
+);
+$showNoReadAlert = ($id > 0 && !$canReadCurrentLevel);
+$canModifyCurrentLevel = ($id > 0) && (
+    ($currentLevelRole !== null && isset($roleRank[$currentLevelRole]) && $roleRank[$currentLevelRole] >= 2)
+);
+$canShareExportCurrentLevel = ($id > 0) && $canReadCurrentLevel;
+
+$editableHierarchyIds = array();
+foreach ($currentUser['roles'] as $scope => $role) {
+    if ($role !== 'modificateur') {
+        continue;
+    }
+    if (strpos($scope, 'hierarchie:') !== 0) {
+        continue;
+    }
+    $scopeId = (int)substr($scope, strlen('hierarchie:'));
+    if ($scopeId > 0) {
+        $editableHierarchyIds[$scopeId] = true;
+    }
+}
+
+function flattenHierarchyForSelect(array $nodes, $depth = 0, array $allowedIds = array()) {
+    $result = array();
+    foreach ($nodes as $node) {
+        $nodeId = (int)$node['id'];
+        $result[] = array(
+            'id' => $nodeId,
+            'nom' => $node['nom'],
+            'depth' => (int)$depth,
+            'can_edit' => isset($allowedIds[$nodeId]),
+        );
+        if (!empty($node['subItems'])) {
+            $children = flattenHierarchyForSelect($node['subItems'], $depth + 1, $allowedIds);
+            foreach ($children as $child) {
+                $result[] = $child;
+            }
+        }
+    }
+    return $result;
+}
+
+$editableHierarchyOptions = flattenHierarchyForSelect(Hierarchie::getAll(false), 0, $editableHierarchyIds);
 
 // Période affichée
 $aujourdhui = new DateTime();
@@ -51,65 +106,80 @@ if ( $tmpRevHierarchie ) {
         );
     }
 }
-$pageTitle = "Plan de charge" . ( $id ? " - " . $tmpHierarchie[0]['nom'] : "" );
+$pageTitle = "Plan de charge" . (($id && !empty($tmpHierarchie[0]['nom'])) ? " - " . $tmpHierarchie[0]['nom'] : "");
 
 include __DIR__ . '/includes/header.php';
 ?>
 
 <div class="container-fluid pdc-container">
 
-    <!-- Breadcrumb -->
-    <ol class="breadcrumb pdc-breadcrumb">
-        <?php foreach ($breadcrumb as $b): ?> 
-            <li><a href="<?php echo htmlspecialchars($b['link'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></a></li>
-        <?php endforeach; ?>
-    </ol>
+    <div class="pdc-topbar">
+        <ol class="breadcrumb pdc-breadcrumb pdc-breadcrumb-inline">
+            <?php foreach ($breadcrumb as $b): ?> 
+                <li><a href="<?php echo htmlspecialchars($b['link'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></a></li>
+            <?php endforeach; ?>
+        </ol>
 
-    <!-- Barre d'outils -->
-    <div class="pdc-toolbar">
-        <div class="row">
-            <div class="col-md-6">
-                <form id="periode_form" method="get" class="form-inline pdc-periode-form">
-                    <?php if ($id): ?>
-                    <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
-                    <?php endif; ?>
+        <div class="pdc-topbar-actions">
+            <form id="periode_form" method="get" class="form-inline pdc-periode-form pdc-periode-form-inline">
+                <?php if ($id): ?>
+                <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
+                <?php endif; ?>
 
-                    <div class="form-group" style="display:flex; align-items:center;">
-                        <label><i class="fa-regular fa-calendar"></i> Du</label>
-                        <input type="text" class="form-control pdc-datepicker" name="date_debut" id="date_debut" value="<?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?>" required>
-                        <label>au</label>
-                        <input type="text" class="form-control pdc-datepicker" name="date_fin" id="date_fin" value="<?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?>" required>
-                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Actualiser</button>
-                    </div>
-                </form>
-            </div>
-            <div class="col-md-6 text-right">
+                <div class="form-group">
+                    <label><i class="fa-regular fa-calendar"></i> Du</label>
+                    <input type="text" class="form-control pdc-datepicker" name="date_debut" id="date_debut" value="<?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?>" required>
+                    <label>&nbsp;au&nbsp;</label>
+                    <input type="text" class="form-control pdc-datepicker" name="date_fin" id="date_fin" value="<?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?>" required>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Actualiser</button>
+                </div>
+            </form>
+
+            <div class="pdc-topbar-buttons">
+                <?php if ($canShareExportCurrentLevel): ?>
                 <button class="btn btn-info" id="btn-share" title="Générer un lien de partage">
                     <i class="fa-regular fa-share-from-square"></i> Partager
                 </button>
                 <button class="btn btn-success" id="btn-export-pdf" title="Exporter en PDF">
                     <i class="fa-regular fa-file-pdf"></i> Export PDF
                 </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
+
     <div class="pdc-content" id="pdc-content">
         <div class="pdc-items-list">
-                <?php foreach ( $tmpHierarchie[0]['subItems'] as $item): ?>
+                <?php if (!empty($hierarchieItems)): ?>
+                <?php foreach ( $hierarchieItems as $item): ?>
+                <?php $subLevelCount = !empty($item['subItems']) ? count($item['subItems']) : 0; ?>
                 <div class="pdc-card">
                     <h3>
-                        <a href="?niveau=departement&id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
-                            <i class="fa-solid fa-building-columns"></i>
+                        <a href="?id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
+                            <i class="fa-solid fa-diagram-project"></i>
                             <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?>
+                            <?php if ($subLevelCount > 0): ?>
+                            <span class="badge bg-secondary" style="display:table; margin:6px 0 0 auto; font-size:0.7rem; padding:0.2rem 0.45rem; line-height:1;">
+                                <?php echo $subLevelCount; ?> sous-niveau<?php echo ($subLevelCount > 1 ? 'x' : ''); ?>
+                            </span>
+                            <?php endif; ?>
                         </a>
                     </h3>
                 </div>
                 <?php endforeach; ?>
+                <?php endif; ?>
         </div>
 
-        <div id="domaines-container" class="pdc-domaines-container">
+        <?php if ($showNoReadAlert): ?>
+        <br>
+        <div class="alert alert-warning" role="alert" style="margin-bottom: 15px;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Vous n'avez pas les droits de lecture des domaines et projets sur ce niveau.
+        </div>
+        <?php endif; ?>
+            <div id="domaines-container" class="pdc-domaines-container">
             <?php 
-                $domainesList = Hierarchie::getDomainesByLevel($id);
+                $domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
                 foreach ($domainesList as $domaine):
                 $projets = Projet::getByDomaine($domaine['id']);
             ?>
@@ -117,12 +187,14 @@ include __DIR__ . '/includes/header.php';
                 <div class="pdc-domaine-header">
                     <h3 class="pdc-domaine-titre">
                         <?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?>
+                        <?php if ($canModifyCurrentLevel): ?>
                         <button class="btn btn-xs btn-link pdc-edit-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" title="Modifier le titre">
                             <i class="fa-solid fa-square-pen"></i>
                         </button>
                         <button class="btn btn-xs btn-link pdc-add-projet" data-domaine-id="<?php echo $domaine['id']; ?>" title="Ajouter un projet">
                             <i class="fa-solid fa-square-plus"></i>
-                        </button>                            
+                        </button>
+                        <?php endif; ?>
                     </h3>
                 </div>
                 <div class="pdc-projets-list" data-domaine-id="<?php echo $domaine['id']; ?>">
@@ -133,9 +205,14 @@ include __DIR__ . '/includes/header.php';
                     <div class="pdc-projet" data-projet-id="<?php echo $projet['id']; ?>">
                         <div class="pdc-projet-header">
                             <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="badge bg-secondary pdc-projet-periode-badge">
+                                <?php echo htmlspecialchars(Helper::formatDate($projet['date_debut']), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars(Helper::formatDate($projet['date_fin']), ENT_QUOTES, 'UTF-8'); ?>
+                            </span>
+                            <?php if ($canModifyCurrentLevel): ?>
                             <button class="btn btn-xs btn-link pdc-edit-projet" data-projet-id="<?php echo $projet['id']; ?>" title="Modifier le projet">
                                 <i class="fa-solid fa-square-pen"></i>
                             </button>
+                            <?php endif; ?>
                         </div>
                         <div class="pdc-frise-container">
                             <div class="pdc-frise" data-projet-id="<?php echo $projet['id']; ?>"
@@ -155,17 +232,9 @@ include __DIR__ . '/includes/header.php';
             <?php endforeach; ?>
 
             <!-- Bouton ajouter un domaine -->
-            <?php
-            // Vérifier si l'utilisateur peut modifier
-            $canModify = false;
-            if ($isAdmin) $canModify = true;
-            elseif (isset($currentData['parent']['ldap_dn'])) {
-                $canModify = Auth::hasRole($currentUser['roles'], $currentData['parent']['ldap_dn'], 'modificateur');
-            }
-            ?>
-            <?php if ($canModify): ?>
+            <?php if ($canModifyCurrentLevel): ?>
             <div class="pdc-add-domaine">
-                <button class="btn btn-success btn-lg" id="btn-add-domaine">
+                <button class="btn btn-success btn-lg" id="btn-add-domaine" data-hierarchie-id="<?php echo (int)$id; ?>">
                     <i class="fa-solid fa-circle-plus"></i> Ajouter un domaine
                 </button>
             </div>
@@ -174,6 +243,7 @@ include __DIR__ . '/includes/header.php';
     </div>
 
 </div>
+<?php if ($canModifyCurrentLevel): ?>
 <!-- Modale : Ajouter un domaine -->
 
 <div class="modal fade" id="modal-add-domaine" tabindex="-1" role="dialog">
@@ -181,7 +251,7 @@ include __DIR__ . '/includes/header.php';
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Nouveau domaine</h4>    
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -190,8 +260,7 @@ include __DIR__ . '/includes/header.php';
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="btn-create-domaine">Créer</button>
+                <button type="button" class="btn btn-primary" id="btn-create-domaine"><i class="fa-solid fa-floppy-disk"></i> Créer</button>
             </div>
         </div>
     </div>
@@ -203,20 +272,29 @@ include __DIR__ . '/includes/header.php';
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Modifier le domaine</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <label for="domaine-nom">Nom du domaine</label>
                     <input type="text" class="form-control" id="domaine-nom" required>
                 </div>
+                <div class="form-group">
+                    <label for="domaine-hierarchie-id">Niveau hiérarchique</label>
+                    <select class="form-control" id="domaine-hierarchie-id" required>
+                        <?php foreach ($editableHierarchyOptions as $hierOption): ?>
+                        <option value="<?php echo (int)$hierOption['id']; ?>"<?php echo ((int)$hierOption['id'] === (int)$id ? ' selected' : ''); ?><?php echo (!empty($hierOption['can_edit']) ? '' : ' disabled'); ?>>
+                            <?php echo str_repeat('-- ', (int)$hierOption['depth']) . htmlspecialchars($hierOption['nom'], ENT_QUOTES, 'UTF-8'); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" id="btn-delete-domaine">
                     <i class="fa-solid fa-trash-can"></i> Supprimer
                 </button>
-                <button type="button" class="btn btn-default" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-primary" id="btn-save-domaine">Enregistrer</button>
+                <button type="button" class="btn btn-primary" id="btn-save-domaine"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
             </div>
         </div>
     </div>
@@ -229,7 +307,7 @@ include __DIR__ . '/includes/header.php';
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Créer un projet</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                         <div class="form-group">
@@ -252,11 +330,7 @@ include __DIR__ . '/includes/header.php';
                         </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-bs-dismiss="modal">
-                    <i class="fa-solid fa-x"></i>
-                    Annuler
-                </button>
-                <button type="button" class="btn btn-primary" id="btn-add-projet">Enregistrer</button>
+                <button type="button" class="btn btn-primary" id="btn-add-projet"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
             </div>
         </div>
     </div>
@@ -268,7 +342,7 @@ include __DIR__ . '/includes/header.php';
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Modifier le projet</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div id="projet-tabs">
@@ -341,23 +415,21 @@ include __DIR__ . '/includes/header.php';
                 <button type="button" class="btn btn-danger" id="btn-delete-projet">
                     <i class="fa-solid fa-trash-can"></i> Supprimer le projet
                 </button>
-                <button type="button" class="btn btn-default" data-bs-dismiss="modal">
-                    <i class="fa-solid fa-x"></i>
-                    Annuler
-                </button>
-                <button type="button" class="btn btn-primary" id="btn-save-projet">Enregistrer</button>
+                <button type="button" class="btn btn-primary" id="btn-save-projet"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
             </div>
         </div>
     </div>
 </div>
+<?php endif; ?>
 
+<?php if ($canShareExportCurrentLevel): ?>
 <!-- Modale : Générer lien de partage -->
 <div class="modal fade" id="modal-share" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title"><i class="fa-solid fa-share-from-square"></i></i> Lien de partage</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p>Ce lien donne accès en <strong>lecture seule</strong> à la vue courante.</p>
@@ -379,16 +451,17 @@ include __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 // Variables globales pour le contexte
 var PDC = {
     appUrl: '<?php echo APP_URL; ?>',
-    niveau: '<?php echo htmlspecialchars($niveau, ENT_QUOTES, 'UTF-8'); ?>',
-    id: <?php echo $id ? (int)$id : 'null'; ?>,
+    niveau: 'hierarchie',
+    id: <?php echo (int)$id; ?>,
     dateDebut: '<?php echo htmlspecialchars($dateDebut, ENT_QUOTES, 'UTF-8'); ?>',
     dateFin: '<?php echo htmlspecialchars($dateFin, ENT_QUOTES, 'UTF-8'); ?>',
-    serviceId: <?php echo ($niveau === 'domaine' && $id) ? (int)$id : 'null'; ?>,
+    hierarchieId: <?php echo (int)$id; ?>,
     currentProjetId: null,
     currentDomaineId: null,
 };

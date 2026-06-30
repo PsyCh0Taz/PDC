@@ -49,41 +49,56 @@ $pageTitle = 'Connexion';
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
 </head>
 <body class="pdc-login-page">
-<div class="pdc-login-container">
-    <div class="pdc-login-logo">
-        <i class="fa fa-calendar-check-o fa-3x"></i>
-        <h1><?php echo APP_NAME; ?></h1>
-    </div>
-    <div class="panel panel-default pdc-login-panel">
-        <div class="panel-body">
-            <?php if ($error): ?>
-            <div class="alert alert-danger">
-                <i class="fa fa-exclamation-triangle"></i>
-                <?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
+<div class="pdc-login-shell">
+    <div class="pdc-login-container">
+        <div class="pdc-login-logo">
+            <div class="pdc-login-logo-icon"><i class="fa-regular fa-calendar-check"></i></div>
+            <h1><?php echo APP_NAME; ?></h1>
+            <p class="pdc-login-subtitle">Plan de charge</p>
+        </div>
+
+        <div class="pdc-login-panel">
+            <div class="pdc-login-panel-head">
+                <h2>Connexion</h2>
+                <p>Authentifiez-vous pour acceder a l'application.</p>
             </div>
-            <?php endif; ?>
-            <form method="post" action="" autocomplete="off">
-                <div class="form-group">
-                    <label for="username"><i class="fa fa-user"></i> Identifiant</label>
-                    <input type="text" class="form-control" id="username" name="username"
-                           placeholder="Votre identifiant"
-                           value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username'], ENT_QUOTES, 'UTF-8') : ''; ?>"
-                           autofocus required>
+
+            <div class="pdc-login-panel-body">
+                <?php if ($error): ?>
+                <div class="alert alert-danger" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?>
                 </div>
-                <div class="form-group">
-                    <label for="password"><i class="fa fa-lock"></i> Mot de passe</label>
-                    <input type="password" class="form-control" id="password" name="password"
-                           placeholder="Votre mot de passe" required>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block btn-lg">
-                    <i class="fa fa-sign-in"></i> Se connecter
-                </button>
-            </form>
+                <?php endif; ?>
+
+                <form method="post" action="" autocomplete="off" class="pdc-login-form">
+                    <div class="mb-3">
+                        <label class="form-label" for="username"><i class="fa-regular fa-user"></i> Utilisateur</label>
+                        <input type="text" class="form-control form-control-lg" id="username" name="username"
+                               placeholder="Votre identifiant Windows (p.nom)"
+                               value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username'], ENT_QUOTES, 'UTF-8') : ''; ?>"
+                               autofocus required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label" for="password"><i class="fa-solid fa-lock"></i> Mot de passe</label>
+                        <input type="password" class="form-control form-control-lg" id="password" name="password"
+                               placeholder="Votre mot de passe Windows" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fa-solid fa-right-to-bracket"></i> Se connecter
+                    </button>
+                </form>
+            </div>
+
+            <div class="pdc-login-panel-foot">
+                <small><i class="fa-solid fa-shield-halved"></i> Authentification LDAP</small>
+            </div>
         </div>
     </div>
-    <p class="text-center text-muted"><small>Authentification LDAP</small></p>
 </div>
 <script src="<?php echo APP_URL; ?>/assets/js/jquery.min.js"></script>
-<script src="<?php echo APP_URL; ?>/assets/js/bootstrap.min.js"></script>
+<script src="<?php echo APP_URL; ?>/assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

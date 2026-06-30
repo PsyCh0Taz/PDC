@@ -25,8 +25,7 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
         <div class="collapse navbar-collapse" id="pdc-nav">
             <?php if (!empty($currentUser)): ?>
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="<?php echo APP_URL; ?>/index.php"><i class="fa-solid fa-house"></i> Plan de charge</a></li>
-                <?php if (!empty($isAdmin) || !empty($isResponsable)): ?>
+                <?php if (!empty($isAdmin)): ?>
                 <li class="nav-item"><a class="nav-link" href="<?php echo APP_URL; ?>/admin.php"><i class="fa-solid fa-gear"></i> Administration</a></li>
                 <?php endif; ?>
                 <li class="nav-item dropdown">

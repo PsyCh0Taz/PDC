@@ -12,3 +12,7 @@ require_once __DIR__ . '/../classes/Journal.php';
 require_once __DIR__ . '/../classes/Projet.php';
 require_once __DIR__ . '/../classes/Hierarchie.php';
 require_once __DIR__ . '/../classes/ShareLink.php';
+
+if (!class_exists('Organisation') && class_exists('Hierarchie')) {
+	class_alias('Hierarchie', 'Organisation');
+}
