@@ -54,7 +54,7 @@ try {
         // ---- Domaines ----
 
         case 'create_domaine':
-            $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : (isset($_POST['service_id']) ? (int)$_POST['service_id'] : 0);
+            $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
             if (empty($nom)) throw new Exception('Nom requis');
             if ($hierarchieId <= 0) throw new Exception('Niveau de hiérarchie invalide');
@@ -637,125 +637,6 @@ try {
             $token = ShareLink::create($urlParams, $currentUser['username']);
             $url = ShareLink::buildUrl($token);
             echo json_encode(array('success' => true, 'url' => $url));
-            break;
-
-        // ---- Organisation (Admin only) ----
-
-        case 'get_ldap_organization':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $ldapOrg = LDAP::getFullOrganization();
-            echo json_encode(array('success' => true, 'organization' => $ldapOrg));
-            break;
-
-        case 'create_entreprise':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
-            $ldapDn = isset($_POST['ldap_dn']) ? trim($_POST['ldap_dn']) : '';
-            
-            if (empty($nom)) throw new Exception('Nom requis');
-            
-            $id = Organisation::createEntreprise($nom, $ldapDn);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'CREATE',
-                'entreprise',
-                $id,
-                'Création entreprise : ' . $nom
-            );
-            echo json_encode(array('success' => true, 'id' => $id));
-            break;
-
-        case 'delete_entreprise':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-            Organisation::deleteEntreprise($id);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'DELETE',
-                'entreprise',
-                $id,
-                'Suppression entreprise'
-            );
-            echo json_encode(array('success' => true));
-            break;
-
-        case 'create_departement':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $entrepriseId = isset($_POST['entreprise_id']) ? (int)$_POST['entreprise_id'] : 0;
-            $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
-            $ldapDn = isset($_POST['ldap_dn']) ? trim($_POST['ldap_dn']) : '';
-            
-            if (empty($nom)) throw new Exception('Nom requis');
-            
-            $id = Organisation::createDepartement($entrepriseId, $nom, $ldapDn);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'CREATE',
-                'departement',
-                $id,
-                'Création département : ' . $nom
-            );
-            echo json_encode(array('success' => true, 'id' => $id));
-            break;
-
-        case 'delete_departement':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-            Organisation::deleteDepartement($id);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'DELETE',
-                'departement',
-                $id,
-                'Suppression département'
-            );
-            echo json_encode(array('success' => true));
-            break;
-
-        case 'create_service':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $departementId = isset($_POST['departement_id']) ? (int)$_POST['departement_id'] : 0;
-            $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
-            $ldapDn = isset($_POST['ldap_dn']) ? trim($_POST['ldap_dn']) : '';
-            
-            if (empty($nom)) throw new Exception('Nom requis');
-            
-            $id = Organisation::createService($departementId, $nom, $ldapDn);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'CREATE',
-                'service',
-                $id,
-                'Création service : ' . $nom
-            );
-            echo json_encode(array('success' => true, 'id' => $id));
-            break;
-
-        case 'delete_service':
-            if (!$isAdmin) throw new Exception('Accès refusé');
-            
-            $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-            Organisation::deleteService($id);
-            Journal::logModification(
-                $currentUser['username'],
-                Journal::getIp(),
-                'DELETE',
-                'service',
-                $id,
-                'Suppression service'
-            );
-            echo json_encode(array('success' => true));
             break;
 
         default:

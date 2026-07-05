@@ -45,59 +45,10 @@ class Auth {
             return self::loginOffline($username, $password);
         }
 
-        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
-        if (!$ldap) {
-            throw new Exception('Impossible de se connecter au serveur LDAP.');
-        }
-
-        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
-
-        // Bind compte de service
-        $bound = @ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS);
-        if (!$bound) {
-            ldap_close($ldap);
-            throw new Exception('Impossible de s\'authentifier sur le serveur LDAP.');
-        }
-
-        // Recherche de l'utilisateur
-        $filter   = '(|(uid=' . ldap_escape($username, '', LDAP_ESCAPE_FILTER) . ')(sAMAccountName=' . ldap_escape($username, '', LDAP_ESCAPE_FILTER) . '))';
-        $search   = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn','cn','mail','displayName','ou','memberOf'));
-        if (!$search) {
-            ldap_close($ldap);
+        $info = LDAP::authenticateUser($username, $password);
+        if ($info === false) {
             return false;
         }
-
-        $entries = ldap_get_entries($ldap, $search);
-        if ($entries['count'] === 0) {
-            ldap_close($ldap);
-            return false;
-        }
-
-        $userDn = $entries[0]['dn'];
-
-        // Bind utilisateur pour vérifier le mot de passe
-        $userBound = @ldap_bind($ldap, $userDn, $password);
-        if (!$userBound) {
-            ldap_close($ldap);
-            return false;
-        }
-
-        $info = array(
-            'username'    => $username,
-            'dn'          => $userDn,
-            'displayname' => isset($entries[0]['displayname'][0]) ? $entries[0]['displayname'][0] : $username,
-            'mail'        => isset($entries[0]['mail'][0]) ? $entries[0]['mail'][0] : '',
-            'groups'      => array(),
-        );
-
-        if (isset($entries[0]['memberof'])) {
-            for ($i = 0; $i < $entries[0]['memberof']['count']; $i++) {
-                $info['groups'][] = $entries[0]['memberof'][$i];
-            }
-        }
-
-        ldap_close($ldap);
 
         // Charger les rôles depuis MySQL
         $info['roles'] = self::loadRoles($username);
@@ -119,38 +70,6 @@ class Auth {
             $roles[$row['role_dn']] = $row['role'];
         }
         return $roles;
-    }
-
-    /**
-     * Retourne le rôle effectif de l'utilisateur sur un DN donné
-     * (recherche dans les ancêtres si pas de rôle direct)
-     */
-    public static function getRoleForDn($userRoles, $dn) {
-        // Rôle direct
-        if (isset($userRoles[$dn])) return $userRoles[$dn];
-
-        // Remonte la hiérarchie DN
-        $parts = ldap_explode_dn($dn, 0);
-        if ($parts && $parts['count'] > 1) {
-            array_shift($parts);
-            unset($parts['count']);
-            $parentDn = implode(',', $parts);
-            return self::getRoleForDn($userRoles, $parentDn);
-        }
-
-        return null;
-    }
-
-    /**
-     * Vérifie si l'utilisateur a au minimum un rôle sur un DN
-     */
-    public static function hasRole($userRoles, $dn, $minRole) {
-        $hierarchy = array('lecteur'=>1, 'modificateur'=>2);
-        $role = self::getRoleForDn($userRoles, $dn);
-        if (!$role) return false;
-        $min = isset($hierarchy[$minRole]) ? $hierarchy[$minRole] : 99;
-        $cur = isset($hierarchy[$role]) ? $hierarchy[$role] : 0;
-        return $cur >= $min;
     }
 
     /**
@@ -182,14 +101,6 @@ class Auth {
     }
 
     /**
-     * Retourne l'utilisateur connecté ou null (sans redirection)
-     */
-    public static function getUser() {
-        self::startSession();
-        return isset($_SESSION['user']) ? $_SESSION['user'] : null;
-    }
-
-    /**
      * Connecte et sauvegarde en session
      */
     public static function setUser($userInfo) {
@@ -215,138 +126,10 @@ class Auth {
     }
 
     /**
-     * Liste les utilisateurs LDAP sous un DN
-     */
-    public static function getUsersUnderDn($baseDn) {
-        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
-        if (!$ldap) return array();
-
-        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
-
-        if (!@ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS)) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $filter = '(|(objectClass=person)(objectClass=inetOrgPerson)(objectClass=user))';
-        $search = @ldap_search($ldap, $baseDn, $filter, array('dn','cn','uid','sAMAccountName','displayName','mail','ou'));
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
-
-        $users = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            $e = $entries[$i];
-            $uid = '';
-            if (!empty($e['uid'][0]))           $uid = $e['uid'][0];
-            elseif (!empty($e['samaccountname'][0])) $uid = $e['samaccountname'][0];
-            if (empty($uid)) continue;
-            $users[] = array(
-                'username'    => $uid,
-                'dn'          => $e['dn'],
-                'displayname' => isset($e['displayname'][0]) ? $e['displayname'][0] : $uid,
-                'mail'        => isset($e['mail'][0]) ? $e['mail'][0] : '',
-            );
-        }
-        return $users;
-    }
-
-    /**
      * Recherche des utilisateurs LDAP par login, nom ou e-mail.
      */
     public static function searchUsers($query, $limit = 20) {
-        $query = trim((string)$query);
-        if ($query === '') {
-            return array();
-        }
-
-        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
-        if (!$ldap) return array();
-
-        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
-
-        if (!@ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS)) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $safe = ldap_escape($query, '', LDAP_ESCAPE_FILTER);
-        $filter = '(&(objectClass=person)(|(uid=*' . $safe . '*)(sAMAccountName=*' . $safe . '*)(cn=*' . $safe . '*)(displayName=*' . $safe . '*)(mail=*' . $safe . '*)))';
-        $search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn','cn','uid','sAMAccountName','displayName','mail'), 0, (int)$limit);
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
-
-        $users = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            $e = $entries[$i];
-            $uid = '';
-            if (!empty($e['uid'][0])) $uid = $e['uid'][0];
-            elseif (!empty($e['samaccountname'][0])) $uid = $e['samaccountname'][0];
-
-            if ($uid === '' || empty($e['dn'])) {
-                continue;
-            }
-
-            $users[] = array(
-                'username' => $uid,
-                'dn' => $e['dn'],
-                'displayname' => !empty($e['displayname'][0]) ? $e['displayname'][0] : (!empty($e['cn'][0]) ? $e['cn'][0] : $uid),
-                'email' => !empty($e['mail'][0]) ? $e['mail'][0] : '',
-            );
-        }
-
-        return $users;
+        return LDAP::searchUsers($query, $limit);
     }
 
-    /**
-     * Récupère l'arborescence LDAP (OU / groupe)
-     */
-    public static function getLdapTree($baseDn = null) {
-        if ($baseDn === null) $baseDn = LDAP_BASE_DN;
-
-        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
-        if (!$ldap) return array();
-
-        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
-
-        if (!@ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS)) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $filter = '(|(objectClass=organizationalUnit)(objectClass=group)(objectClass=groupOfNames))';
-        $search = @ldap_list($ldap, $baseDn, $filter, array('dn','ou','cn','objectClass'));
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
-
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
-
-        $tree = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            $e = $entries[$i];
-            $name = '';
-            if (!empty($e['ou'][0]))  $name = $e['ou'][0];
-            elseif (!empty($e['cn'][0])) $name = $e['cn'][0];
-            $tree[] = array(
-                'dn'   => $e['dn'],
-                'name' => $name,
-            );
-        }
-        return $tree;
-    }
 }

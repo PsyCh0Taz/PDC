@@ -33,32 +33,5 @@ class Helper {
         return '';
     }
 
-    /**
-     * Convertit une date au format dd/mm/yyyy en yyyy-mm-dd (pour stockage/URL)
-     */
-    public static function parseDateInput($date) {
-        if (empty($date)) {
-            return '';
-        }
-
-        // Si format dd/mm/yyyy
-        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $date, $matches)) {
-            return $matches[3] . '-' . $matches[2] . '-' . $matches[1];
-        }
-
-        // Si déjà au format yyyy-mm-dd
-        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $date)) {
-            return substr($date, 0, 10);
-        }
-
-        return '';
-    }
-
-    /**
-     * Escape HTML pour l'affichage sécurisé
-     */
-    public static function escape($text) {
-        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-    }
 }
 ?>

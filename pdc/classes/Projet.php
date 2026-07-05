@@ -169,7 +169,7 @@ class Projet {
         }
     }
 
-    public static function moveTodomaine($projetId, $domaineId) {
+    public static function moveToDomaine($projetId, $domaineId) {
         $db = Database::getInstance();
         // Ordre à la fin du domaine cible
         $last = $db->fetchOne(

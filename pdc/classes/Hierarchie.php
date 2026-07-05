@@ -90,31 +90,6 @@ class Hierarchie {
         );
     }
 
-    public static function getEntreprises($onlyActive = true) {
-        return self::getAll($onlyActive);
-    }
-
-    public static function getEntrepriseById($id, $onlyActive = true) {
-        $level = self::getLevel($id, $onlyActive);
-        return !empty($level[0]) ? $level[0] : null;
-    }
-
-    public static function getDepartements($hierarchieId, $onlyActive = true) {
-        return self::getSubLevel($hierarchieId, $onlyActive);
-    }
-
-    public static function getDepartementById($id, $onlyActive = true) {
-        return self::getById($id, $onlyActive);
-    }
-
-    public static function getServices($hierarchieId, $onlyActive = true) {
-        return self::getSubLevel($hierarchieId, $onlyActive);
-    }
-
-    public static function getServiceById($id, $onlyActive = true) {
-        return self::getById($id, $onlyActive);
-    }
-
     public static function setActif($hierarchieId, $actif) {
         $db = Database::getInstance();
         return $db->execute(
@@ -279,13 +254,13 @@ class Hierarchie {
         );
     }
 
-    public static function hasChildren($id) {
+    private static function hasChildren($id) {
         $db = Database::getInstance();
         $row = $db->fetchOne('SELECT COUNT(*) AS c FROM hierarchie WHERE id_parent = ?', array((int)$id));
         return $row ? ((int)$row['c'] > 0) : false;
     }
 
-    public static function hasDomaines($id) {
+    private static function hasDomaines($id) {
         $db = Database::getInstance();
         $row = $db->fetchOne('SELECT COUNT(*) AS c FROM domaines WHERE hierarchie_id = ?', array((int)$id));
         return $row ? ((int)$row['c'] > 0) : false;
@@ -373,18 +348,13 @@ class Hierarchie {
         );
     }
 
-    public static function getDomaineById($id) {
+    public static function createDomaine($hierarchieId, $nom) {
         $db = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM domaines WHERE id = ?', array((int)$id));
-    }
-
-    public static function createDomaine($serviceId, $nom) {
-        $db = Database::getInstance();
-        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM domaines WHERE hierarchie_id = ?', array((int)$serviceId));
+        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM domaines WHERE hierarchie_id = ?', array((int)$hierarchieId));
         $ordre = $last ? (int)$last['m'] + 1 : 0;
         return $db->insert(
             'INSERT INTO domaines (hierarchie_id, nom, ordre) VALUES (?, ?, ?)',
-            array((int)$serviceId, self::sanitize($nom), $ordre)
+            array((int)$hierarchieId, self::sanitize($nom), $ordre)
         );
     }
 
@@ -465,121 +435,6 @@ class Hierarchie {
         foreach ($ordres as $id => $ordre) {
             $db->execute('UPDATE domaines SET ordre = ? WHERE id = ?', array((int)$ordre, (int)$id));
         }
-    }
-
-    // ---- Administration : activation services ----
-
-    public static function setServiceActif($serviceId, $actif) {
-        $db = Database::getInstance();
-        return $db->execute(
-            'UPDATE services SET actif = ? WHERE id = ?',
-            array($actif ? 1 : 0, (int)$serviceId)
-        );
-    }
-
-    // ---- Création / Suppression Entreprises ----
-
-    public static function createEntreprise($nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM entreprises');
-        $ordre = $last ? (int)$last['m'] + 1 : 0;
-        return $db->insert(
-            'INSERT INTO entreprises (nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, 1)',
-            array(self::sanitize($nom), $ldapDn, $ordre)
-        );
-    }
-
-    public static function updateEntreprise($id, $nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        return $db->execute(
-            'UPDATE entreprises SET nom = ?, ldap_dn = ? WHERE id = ?',
-            array(self::sanitize($nom), $ldapDn, (int)$id)
-        );
-    }
-
-    public static function deleteEntreprise($id) {
-        $db = Database::getInstance();
-        return $db->execute('DELETE FROM entreprises WHERE id = ?', array((int)$id));
-    }
-
-    // ---- Création / Suppression Départements ----
-
-    public static function createDepartement($entrepriseId, $nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM departements WHERE entreprise_id = ?', array((int)$entrepriseId));
-        $ordre = $last ? (int)$last['m'] + 1 : 0;
-        return $db->insert(
-            'INSERT INTO departements (entreprise_id, nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, ?, 1)',
-            array((int)$entrepriseId, self::sanitize($nom), $ldapDn, $ordre)
-        );
-    }
-
-    public static function updateDepartement($id, $nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        return $db->execute(
-            'UPDATE departements SET nom = ?, ldap_dn = ? WHERE id = ?',
-            array(self::sanitize($nom), $ldapDn, (int)$id)
-        );
-    }
-
-    public static function deleteDepartement($id) {
-        $db = Database::getInstance();
-        return $db->execute('DELETE FROM departements WHERE id = ?', array((int)$id));
-    }
-
-    // ---- Création / Suppression Services ----
-
-    public static function createService($departementId, $nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM services WHERE departement_id = ?', array((int)$departementId));
-        $ordre = $last ? (int)$last['m'] + 1 : 0;
-        return $db->insert(
-            'INSERT INTO services (departement_id, nom, ldap_dn, ordre, actif) VALUES (?, ?, ?, ?, 1)',
-            array((int)$departementId, self::sanitize($nom), $ldapDn, $ordre)
-        );
-    }
-
-    public static function updateService($id, $nom, $ldapDn = '') {
-        $db = Database::getInstance();
-        return $db->execute(
-            'UPDATE services SET nom = ?, ldap_dn = ? WHERE id = ?',
-            array(self::sanitize($nom), $ldapDn, (int)$id)
-        );
-    }
-
-    public static function deleteService($id) {
-        $db = Database::getInstance();
-        return $db->execute('DELETE FROM services WHERE id = ?', array((int)$id));
-    }
-
-    // ---- Synchronisation LDAP → MySQL ----
-
-    /**
-     * Importe / met à jour la structure LDAP dans la base
-     * (à appeler depuis l'administration)
-     */
-    public static function syncLdap() {
-        // Cette méthode est appelée manuellement depuis la vue admin
-        // Elle parcourt l'arbre LDAP et crée/met à jour les entités
-        // La logique complète dépend de la structure LDAP spécifique
-        // Implémentation simplifiée ci-dessous
-        return true;
-    }
-
-    // ---- Paramètres ----
-
-    public static function getParam($cle) {
-        $db = Database::getInstance();
-        $row = $db->fetchOne('SELECT valeur FROM parametres WHERE cle = ?', array($cle));
-        return $row ? $row['valeur'] : '';
-    }
-
-    public static function setParam($cle, $valeur) {
-        $db = Database::getInstance();
-        $db->execute(
-            'INSERT INTO parametres (cle, valeur) VALUES (?, ?) ON DUPLICATE KEY UPDATE valeur = ?',
-            array($cle, $valeur, $valeur)
-        );
     }
 
     // ---- Helpers ----

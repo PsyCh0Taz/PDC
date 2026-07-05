@@ -5,145 +5,281 @@
 
 class LDAP {
 
-    /**
-     * Se connecte au serveur LDAP
-     * Retourne une ressource LDAP ou lance une exception
-     */
-    private static function connect() {
-        $ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
-        if (!$ldap) {
-            throw new Exception('Impossible de se connecter au serveur LDAP.');
-        }
+	/**
+	 * Echappe une valeur pour un filtre LDAP (compat PHP 5.4).
+	 */
+	private static function escapeFilterValue($value) {
+		$value = (string)$value;
+		return str_replace(
+			array('\\', '*', '(', ')', chr(0)),
+			array('\\5c', '\\2a', '\\28', '\\29', '\\00'),
+			$value
+		);
+	}
 
-        ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
+	/**
+	 * Ouvre une connexion LDAP et configure les options de base.
+	 */
+	private static function openConnection() {
+		$ldap = @ldap_connect(LDAP_HOST, LDAP_PORT);
+		if (!$ldap) {
+			throw new Exception('Impossible de se connecter au serveur LDAP.');
+		}
 
-        // Bind compte de service
-        $bound = @ldap_bind($ldap, LDAP_USER_DN, LDAP_USER_DN_PASS);
-        if (!$bound) {
-            ldap_close($ldap);
-            throw new Exception('Impossible de s\'authentifier sur le serveur LDAP.');
-        }
+		@ldap_set_option($ldap, LDAP_OPT_PROTOCOL_VERSION, 3);
+		@ldap_set_option($ldap, LDAP_OPT_REFERRALS, 0);
 
-        return $ldap;
-    }
+		return $ldap;
+	}
 
-    /**
-     * Récupère les entreprises du LDAP (filter: objectClass=organizationalUnit)
-     * Cherche dans les OU de premier niveau
-     */
-    public static function getEntreprisesFromLDAP() {
-        $ldap = self::connect();
-        
-        // Chercher les OU de premier niveau sous le base DN
-        $filter = '(objectClass=organizationalUnit)';
-        $search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('ou', 'description'), false, 500);
-        
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
+	/**
+	 * Bind LDAP avec compte technique, ou anonyme si LDAP_USER_DN est vide.
+	 */
+	private static function bindAccount($ldap) {
+		$serviceDn = trim((string)LDAP_USER_DN);
+		if ($serviceDn === '') {
+			return @ldap_bind($ldap);
+		}
+		return @ldap_bind($ldap, $serviceDn, LDAP_USER_DN_PASS);
+	}
 
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
+	/**
+	 * Retourne une connexion LDAP déjà bindée (technique/anonyme).
+	 */
+	private static function connectAsAccount() {
+		$ldap = self::openConnection();
+		if (!self::bindAccount($ldap)) {
+			$err = @ldap_error($ldap);
+			@ldap_unbind($ldap);
+			throw new Exception('Impossible de s\'authentifier sur le serveur LDAP' . ($err ? ' (' . $err . ')' : '') . '.');
+		}
+		return $ldap;
+	}
 
-        $entreprises = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            if ($entries[$i]['count'] > 0) {
-                $entreprises[] = array(
-                    'ou' => $entries[$i]['ou'][0],
-                    'dn' => $entries[$i]['dn'],
-                    'description' => isset($entries[$i]['description'][0]) ? $entries[$i]['description'][0] : ''
-                );
-            }
-        }
+	/**
+	 * Authentifie un utilisateur LDAP et retourne ses informations,
+	 * ou false si login/mot de passe invalide.
+	 */
+	public static function authenticateUser($username, $password) {
+		$ldap = self::openConnection();
 
-        return $entreprises;
-    }
+		if (!self::bindAccount($ldap)) {
+			$err = @ldap_error($ldap);
+			@ldap_unbind($ldap);
+			throw new Exception('Impossible de s\'authentifier sur le serveur LDAP' . ($err ? ' (' . $err . ')' : '') . '.');
+		}
 
-    /**
-     * Récupère les départements d'une entreprise du LDAP
-     */
-    public static function getDepartementsFromLDAP($entrepriseDN) {
-        $ldap = self::connect();
-        
-        $filter = '(objectClass=organizationalUnit)';
-        $search = @ldap_search($ldap, $entrepriseDN, $filter, array('ou', 'description'), false, 500);
-        
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
+		$safeUser = self::escapeFilterValue($username);
+		$filter = '(|(uid=' . $safeUser . ')(sAMAccountName=' . $safeUser . '))';
+		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'cn', 'mail', 'displayName', 'ou', 'memberOf'));
 
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
+		if (!$search) {
+			@ldap_unbind($ldap);
+			return false;
+		}
 
-        $departements = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            if ($entries[$i]['count'] > 0 && $entries[$i]['dn'] !== $entrepriseDN) {
-                $departements[] = array(
-                    'ou' => $entries[$i]['ou'][0],
-                    'dn' => $entries[$i]['dn'],
-                    'description' => isset($entries[$i]['description'][0]) ? $entries[$i]['description'][0] : ''
-                );
-            }
-        }
+		$entries = @ldap_get_entries($ldap, $search);
+		if (!is_array($entries) || empty($entries['count'])) {
+			@ldap_unbind($ldap);
+			return false;
+		}
 
-        return $departements;
-    }
+		$userDn = $entries[0]['dn'];
+		$userBound = @ldap_bind($ldap, $userDn, $password);
+		if (!$userBound) {
+			@ldap_unbind($ldap);
+			return false;
+		}
 
-    /**
-     * Récupère les services d'un département du LDAP
-     */
-    public static function getServicesFromLDAP($departementDN) {
-        $ldap = self::connect();
-        
-        $filter = '(objectClass=organizationalUnit)';
-        $search = @ldap_search($ldap, $departementDN, $filter, array('ou', 'description'), false, 500);
-        
-        if (!$search) {
-            ldap_close($ldap);
-            return array();
-        }
+		$groups = array();
+		if (isset($entries[0]['memberof'])) {
+			for ($i = 0; $i < $entries[0]['memberof']['count']; $i++) {
+				$groups[] = $entries[0]['memberof'][$i];
+			}
+		}
 
-        $entries = ldap_get_entries($ldap, $search);
-        ldap_close($ldap);
+		$result = array(
+			'username' => $username,
+			'dn' => $userDn,
+			'displayname' => isset($entries[0]['displayname'][0]) ? $entries[0]['displayname'][0] : $username,
+			'mail' => isset($entries[0]['mail'][0]) ? $entries[0]['mail'][0] : '',
+			'groups' => $groups,
+		);
 
-        $services = array();
-        for ($i = 0; $i < $entries['count']; $i++) {
-            if ($entries[$i]['count'] > 0 && $entries[$i]['dn'] !== $departementDN) {
-                $services[] = array(
-                    'ou' => $entries[$i]['ou'][0],
-                    'dn' => $entries[$i]['dn'],
-                    'description' => isset($entries[$i]['description'][0]) ? $entries[$i]['description'][0] : ''
-                );
-            }
-        }
+		@ldap_unbind($ldap);
+		return $result;
+	}
 
-        return $services;
-    }
+	/**
+	 * Recherche des utilisateurs LDAP par login, nom ou e-mail.
+	 */
+	public static function searchUsers($query, $limit = 20) {
+		$query = trim((string)$query);
+		if ($query === '') {
+			return array();
+		}
 
-    /**
-     * Récupère la structure complète de l'organisation du LDAP
-     * Retourne un tableau imbriqué : entreprises > départements > services
-     */
-    public static function getFullOrganization() {
-        $entreprises = self::getEntreprisesFromLDAP();
-        $result = array();
+		try {
+			$ldap = self::connectAsAccount();
+		} catch (Exception $e) {
+			return array();
+		}
 
-        foreach ($entreprises as $entreprise) {
-            $departements = self::getDepartementsFromLDAP($entreprise['dn']);
-            $entreprise['departements'] = array();
+		$safe = self::escapeFilterValue($query);
+		$filter = '(&(objectClass=person)(|(uid=*' . $safe . '*)(sAMAccountName=*' . $safe . '*)(cn=*' . $safe . '*)(displayName=*' . $safe . '*)(mail=*' . $safe . '*)))';
+		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'cn', 'uid', 'sAMAccountName', 'displayName', 'mail'), 0, (int)$limit);
+		if (!$search) {
+			@ldap_unbind($ldap);
+			return array();
+		}
 
-            foreach ($departements as $departement) {
-                $services = self::getServicesFromLDAP($departement['dn']);
-                $departement['services'] = $services;
-                $entreprise['departements'][] = $departement;
-            }
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
 
-            $result[] = $entreprise;
-        }
+		$users = array();
+		if (!is_array($entries) || empty($entries['count'])) {
+			return $users;
+		}
 
-        return $result;
-    }
+		for ($i = 0; $i < $entries['count']; $i++) {
+			$e = $entries[$i];
+			$uid = '';
+			if (!empty($e['uid'][0])) {
+				$uid = $e['uid'][0];
+			} elseif (!empty($e['samaccountname'][0])) {
+				$uid = $e['samaccountname'][0];
+			}
+
+			if ($uid === '' || empty($e['dn'])) {
+				continue;
+			}
+
+			$users[] = array(
+				'username' => $uid,
+				'dn' => $e['dn'],
+				'displayname' => !empty($e['displayname'][0]) ? $e['displayname'][0] : (!empty($e['cn'][0]) ? $e['cn'][0] : $uid),
+				'email' => !empty($e['mail'][0]) ? $e['mail'][0] : '',
+			);
+		}
+
+		return $users;
+	}
+
+	/**
+	 * Retourne les OU enfants directes d'un DN.
+	 */
+	private static function getChildOus($baseDn, $excludeDn = '') {
+		$ldap = self::connectAsAccount();
+
+		$filter = '(objectClass=organizationalUnit)';
+		$search = @ldap_search($ldap, $baseDn, $filter, array('ou', 'description'), false, 500);
+		if (!$search) {
+			@ldap_unbind($ldap);
+			return array();
+		}
+
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
+
+		$result = array();
+		if (!is_array($entries) || empty($entries['count'])) {
+			return $result;
+		}
+
+		for ($i = 0; $i < $entries['count']; $i++) {
+			if (!isset($entries[$i]) || !isset($entries[$i]['count']) || $entries[$i]['count'] <= 0) {
+				continue;
+			}
+			$dn = isset($entries[$i]['dn']) ? $entries[$i]['dn'] : '';
+			if ($excludeDn !== '' && $dn === $excludeDn) {
+				continue;
+			}
+			$result[] = array(
+				'ou' => isset($entries[$i]['ou'][0]) ? $entries[$i]['ou'][0] : '',
+				'dn' => $dn,
+				'description' => isset($entries[$i]['description'][0]) ? $entries[$i]['description'][0] : '',
+			);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Diagnostic détaillé de connexion LDAP pour la page setup.
+	 */
+	public static function runConnectionDiagnostic($filter = '(objectClass=organizationalUnit)', $limit = 500) {
+		$steps = array();
+		$ldap = null;
+
+		try {
+			$steps[] = array('label' => 'Verification extension LDAP', 'status' => 'ok', 'detail' => extension_loaded('ldap') ? 'Extension LDAP chargee.' : '');
+			if (!extension_loaded('ldap')) {
+				throw new Exception('Extension LDAP non disponible sur PHP.');
+			}
+
+			$ldap = self::openConnection();
+			$steps[] = array('label' => 'Connexion au serveur LDAP', 'status' => 'ok', 'detail' => 'Connexion ouverte sur ' . LDAP_HOST . ':' . LDAP_PORT . '.');
+
+			$steps[] = array('label' => 'Configuration des options LDAP', 'status' => 'ok', 'detail' => 'Protocol v3 et referrals desactives.');
+
+			$serviceDn = trim((string)LDAP_USER_DN);
+			$bindLabel = ($serviceDn === '') ? 'Bind anonyme' : 'Bind avec le compte de service';
+			if (!self::bindAccount($ldap)) {
+				$ldapError = @ldap_error($ldap);
+				throw new Exception('Bind LDAP refuse' . ($ldapError ? ' (' . $ldapError . ')' : '') . '.');
+			}
+			$steps[] = array('label' => $bindLabel, 'status' => 'ok', 'detail' => ($serviceDn === '') ? 'Bind anonyme valide.' : 'Bind du compte de service valide.');
+
+			$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('ou', 'description'), false, (int)$limit);
+			if (!$search) {
+				$ldapError = @ldap_error($ldap);
+				throw new Exception('Recherche LDAP echouee' . ($ldapError ? ' (' . $ldapError . ')' : '') . '.');
+			}
+			$steps[] = array('label' => 'Recherche des OU', 'status' => 'ok', 'detail' => 'Requete LDAP executee.');
+
+			$entries = @ldap_get_entries($ldap, $search);
+			if (!is_array($entries)) {
+				throw new Exception('Impossible de lire les resultats LDAP.');
+			}
+
+			$count = isset($entries['count']) ? (int)$entries['count'] : 0;
+			$rows = array();
+			for ($i = 0; $i < $count; $i++) {
+				if (!isset($entries[$i])) {
+					continue;
+				}
+				$rows[] = array(
+					'ou' => isset($entries[$i]['ou'][0]) ? (string)$entries[$i]['ou'][0] : '',
+					'dn' => isset($entries[$i]['dn']) ? (string)$entries[$i]['dn'] : '',
+					'description' => isset($entries[$i]['description'][0]) ? (string)$entries[$i]['description'][0] : '',
+				);
+			}
+
+			$steps[] = array('label' => 'Lecture des resultats', 'status' => 'ok', 'detail' => $count . ' entree(s) LDAP retournee(s).');
+
+			@ldap_unbind($ldap);
+
+			return array(
+				'success' => true,
+				'message' => 'Connexion LDAP reussie.',
+				'count' => $count,
+				'base_dn' => LDAP_BASE_DN,
+				'filter' => $filter,
+				'results' => $rows,
+				'steps' => $steps,
+			);
+		} catch (Exception $e) {
+			if ($ldap) {
+				@ldap_unbind($ldap);
+			}
+
+			$steps[] = array('label' => 'Erreur', 'status' => 'error', 'detail' => $e->getMessage());
+
+			return array(
+				'success' => false,
+				'message' => 'Echec connexion LDAP: ' . $e->getMessage(),
+				'steps' => $steps,
+			);
+		}
+	}
 }
