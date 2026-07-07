@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 Auth::startSession();
 
@@ -12,7 +12,7 @@ $error = '';
 $dbResult = null;
 $ldapResult = null;
 $configResult = null;
-$configFile = __DIR__ . '/config/config.php';
+$configFile = __DIR__ . '/../config/config.php';
 
 function setupEscapePhpString($value) {
     return str_replace(array('\\', "'"), array('\\\\', "\\'"), (string)$value);
@@ -65,7 +65,7 @@ if (empty($_SESSION[$setupSessionKey])) {
 
         if ($username === SETUP_LOCAL_USER && $password === SETUP_LOCAL_PASS) {
             $_SESSION[$setupSessionKey] = true;
-            header('Location: ' . APP_URL . '/setup.php');
+            header('Location: ' . APP_URL . '/setup/');
             exit;
         }
 
@@ -497,6 +497,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <label class="form-label"><strong>Resultat LDAP (JSON)</strong></label>
                         <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
                     </div>
+                    <?php if (!empty($ldapResult['service_account']) || true ): ?>
+                    <div class="mt-3">
+                        <label class="form-label"><strong>Attributs du compte de service (ldap_user_dn)</strong></label>
+                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['service_account'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                    </div>
+                    <?php endif; ?>
                     <?php endif; ?>
                     <?php endif; ?>
                 </div>

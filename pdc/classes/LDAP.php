@@ -249,6 +249,28 @@ class LDAP {
 
 			$steps[] = array('label' => 'Lecture des resultats', 'status' => 'ok', 'detail' => $count . ' entree(s) LDAP retournee(s).');
 
+			// Récupérer les informations du compte de service (ldap_user_dn)
+			$serviceDnFields = array();
+			$serviceDn = trim((string)LDAP_USER_DN);
+			if ($serviceDn !== '') {
+				$search = @ldap_read($ldap, $serviceDn, '(objectClass=*)', array(), false);
+				if ($search) {
+					$entries = @ldap_get_entries($ldap, $search);
+					if (is_array($entries) && isset($entries[0])) {
+						// Récupérer tous les attributs sauf 'count' et les index numériques
+						foreach ($entries[0] as $key => $value) {
+							if ($key !== 'count' && !is_numeric($key) && is_array($value)) {
+								// Prendre le premier élément du tableau si c'est un tableau
+								if (isset($value[0])) {
+									$serviceDnFields[$key] = $value[0];
+								}
+							}
+						}
+					}
+				}
+				$steps[] = array('label' => 'Lecture du compte de service', 'status' => 'ok', 'detail' => 'Attributs du compte de service recuperes.');
+			}
+
 			@ldap_unbind($ldap);
 
 			return array(
@@ -258,6 +280,7 @@ class LDAP {
 				'base_dn' => LDAP_BASE_DN,
 				'filter' => $filter,
 				'results' => $rows,
+				'service_account' => $serviceDnFields,
 				'steps' => $steps,
 			);
 		} catch (Exception $e) {
