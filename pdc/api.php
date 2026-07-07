@@ -35,17 +35,17 @@ $userHasMinRoleOnHierarchy = function($hierarchieId, $minRole) use ($currentUser
 
 $getHierarchyIdByDomaine = function($domaineId) {
     $db = Database::getInstance();
-    $row = $db->fetchOne('SELECT hierarchie_id FROM domaines WHERE id = ?', array((int)$domaineId));
-    return $row ? (int)$row['hierarchie_id'] : 0;
+    $row = $db->fetchOne('SELECT pdc_hierarchie_id FROM pdc_domaines WHERE id = ?', array((int)$domaineId));
+    return $row ? (int)$row['pdc_hierarchie_id'] : 0;
 };
 
 $getHierarchyIdByProjet = function($projetId) {
     $db = Database::getInstance();
     $row = $db->fetchOne(
-        'SELECT d.hierarchie_id FROM projets p INNER JOIN domaines d ON d.id = p.domaine_id WHERE p.id = ?',
+        'SELECT d.pdc_hierarchie_id FROM pdc_projets p INNER JOIN pdc_domaines d ON d.id = p.domaine_id WHERE p.id = ?',
         array((int)$projetId)
     );
-    return $row ? (int)$row['hierarchie_id'] : 0;
+    return $row ? (int)$row['pdc_hierarchie_id'] : 0;
 };
 
 try {
@@ -54,7 +54,7 @@ try {
         // ---- Domaines ----
 
         case 'create_domaine':
-            $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
+            $hierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
             if (empty($nom)) throw new Exception('Nom requis');
             if ($hierarchieId <= 0) throw new Exception('Niveau de hiérarchie invalide');
@@ -75,7 +75,7 @@ try {
         case 'update_domaine':
             $id  = isset($_POST['id']) ? (int)$_POST['id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
-            $newHierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
+            $newHierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
             if (empty($nom)) throw new Exception('Nom requis');
 
             $currentHierarchieId = $getHierarchyIdByDomaine($id);
@@ -270,8 +270,8 @@ try {
             if (!$isAdmin) throw new Exception('Accès refusé');
             
             $db = Database::getInstance();
-            $users = $db->fetchAll('SELECT DISTINCT username, displayname, dn, email FROM utilisateurs ORDER BY displayname');
-            $roles = $db->fetchAll('SELECT * FROM utilisateurs_roles');
+            $users = $db->fetchAll('SELECT DISTINCT username, displayname, dn, email FROM pdc_utilisateurs ORDER BY displayname');
+            $roles = $db->fetchAll('SELECT * FROM pdc_utilisateurs_roles');
             $hierarchie = Hierarchie::getAll(false);
             
             $rolesMap = array();
@@ -306,10 +306,10 @@ try {
             $db = Database::getInstance();
             
             if ($enabled) {
-                $db->execute('DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
+                $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
                     array($username, $dn, $role));
                 $db->insert(
-                    'INSERT INTO utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                    'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
                     array($username, $dn, $role)
                 );
                 Journal::logModification(
@@ -321,7 +321,7 @@ try {
                     "Rôle '$role' assigné à $username"
                 );
             } else {
-                $db->execute('DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
+                $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
                     array($username, $dn, $role));
                 Journal::logModification(
                     $currentUser['username'],
@@ -353,11 +353,11 @@ try {
             }
 
             $db = Database::getInstance();
-            $db->execute('DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, $scope));
+            $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, $scope));
 
             if ($role !== '') {
                 $db->insert(
-                    'INSERT INTO utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                    'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
                     array($username, $scope, $role)
                 );
             }
@@ -385,11 +385,11 @@ try {
             }
 
             $db = Database::getInstance();
-            $db->execute('DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, '*'));
+            $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, '*'));
 
             if ($enabled) {
                 $db->insert(
-                    'INSERT INTO utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                    'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
                     array($username, '*', 'admin')
                 );
             }
@@ -436,7 +436,7 @@ try {
 
             $db = Database::getInstance();
             $db->execute(
-                'INSERT INTO utilisateurs (username, displayname, dn, email) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE displayname = VALUES(displayname), dn = VALUES(dn), email = VALUES(email)',
+                'INSERT INTO pdc_utilisateurs (username, displayname, dn, email) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE displayname = VALUES(displayname), dn = VALUES(dn), email = VALUES(email)',
                 array($username, $displayname, $dn, $email !== '' ? $email : null)
             );
 
@@ -465,7 +465,7 @@ try {
             }
 
             $db = Database::getInstance();
-            $deleted = $db->execute('DELETE FROM utilisateurs WHERE username = ?', array($username));
+            $deleted = $db->execute('DELETE FROM pdc_utilisateurs WHERE username = ?', array($username));
 
             if ($deleted <= 0) {
                 throw new Exception('Utilisateur introuvable');

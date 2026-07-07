@@ -522,33 +522,34 @@ INSERT INTO `projets` (`id`, `domaine_id`, `titre`, `date_debut`, `date_fin`, `o
 -- Table structure for table `projet_gradients`
 --
 
-CREATE TABLE `projet_gradients` (
+CREATE TABLE `pdc_projet_gradients` (
   `id` int(10) UNSIGNED NOT NULL,
   `projet_id` int(10) UNSIGNED NOT NULL,
   `date_gradient` date NOT NULL,
-  `couleur` enum('vert','jaune','orange','rouge') NOT NULL DEFAULT 'vert'
+  `couleur` enum('vert','jaune','orange','rouge') NOT NULL DEFAULT 'vert',
+  `libelle` varchar(255) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 --
--- Dumping data for table `projet_gradients`
+-- Dumping data for table `pdc_projet_gradients`
 --
 
-INSERT INTO `projet_gradients` (`id`, `projet_id`, `date_gradient`, `couleur`) VALUES
-(445, 3, '2026-06-18', 'jaune'),
-(446, 3, '2026-06-21', 'orange'),
-(447, 3, '2026-06-24', 'rouge'),
-(477, 1, '2026-04-27', 'rouge'),
-(478, 1, '2026-05-04', 'orange'),
-(479, 1, '2026-05-11', 'jaune'),
-(480, 1, '2026-05-18', 'vert'),
-(481, 1, '2026-05-25', 'jaune'),
-(482, 1, '2026-06-01', 'orange'),
-(483, 1, '2026-06-08', 'rouge'),
-(484, 1, '2026-07-09', 'rouge'),
-(485, 1, '2026-07-13', 'jaune'),
-(486, 2, '2026-06-01', 'jaune'),
-(487, 2, '2026-06-15', 'orange'),
-(488, 2, '2026-06-22', 'rouge');
+INSERT INTO `pdc_projet_gradients` (`id`, `projet_id`, `date_gradient`, `couleur`, `libelle`) VALUES
+(445, 3, '2026-06-18', 'jaune', ''),
+(446, 3, '2026-06-21', 'orange', ''),
+(447, 3, '2026-06-24', 'rouge', ''),
+(477, 1, '2026-04-27', 'rouge', ''),
+(478, 1, '2026-05-04', 'orange', ''),
+(479, 1, '2026-05-11', 'jaune', ''),
+(480, 1, '2026-05-18', 'vert', ''),
+(481, 1, '2026-05-25', 'jaune', ''),
+(482, 1, '2026-06-01', 'orange', ''),
+(483, 1, '2026-06-08', 'rouge', ''),
+(484, 1, '2026-07-09', 'rouge', ''),
+(485, 1, '2026-07-13', 'jaune', ''),
+(486, 2, '2026-06-01', 'jaune', ''),
+(487, 2, '2026-06-15', 'orange', ''),
+(488, 2, '2026-06-22', 'rouge', '');
 
 -- --------------------------------------------------------
 

@@ -71,7 +71,7 @@ class LDAP {
 
 		$safeUser = self::escapeFilterValue($username);
 		$filter = '(|(uid=' . $safeUser . ')(sAMAccountName=' . $safeUser . '))';
-		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'cn', 'mail', 'displayName', 'ou', 'memberOf'));
+		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'cn', 'mail', 'displayName', 'ou'));
 
 		if (!$search) {
 			@ldap_unbind($ldap);
@@ -91,19 +91,11 @@ class LDAP {
 			return false;
 		}
 
-		$groups = array();
-		if (isset($entries[0]['memberof'])) {
-			for ($i = 0; $i < $entries[0]['memberof']['count']; $i++) {
-				$groups[] = $entries[0]['memberof'][$i];
-			}
-		}
-
 		$result = array(
 			'username' => $username,
 			'dn' => $userDn,
 			'displayname' => isset($entries[0]['displayname'][0]) ? $entries[0]['displayname'][0] : $username,
 			'mail' => isset($entries[0]['mail'][0]) ? $entries[0]['mail'][0] : '',
-			'groups' => $groups,
 		);
 
 		@ldap_unbind($ldap);

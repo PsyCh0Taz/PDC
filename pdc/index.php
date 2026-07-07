@@ -223,6 +223,23 @@ include __DIR__ . '/includes/header.php';
                                     data-gradients='<?php echo json_encode($gradients); ?>'
                                     data-jalons='<?php echo json_encode($jalons); ?>'>
                             </div>
+                            <button class="pdc-jalons-toggle-btn" data-projet-id="<?php echo $projet['id']; ?>" title="Afficher/Masquer les jalons">
+                                <i class="fa-solid fa-angles-down"></i>
+                            </button>
+                        </div>
+                        <div class="pdc-jalons-table-container" data-projet-id="<?php echo $projet['id']; ?>" style="display: none;">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Couleur</th>
+                                        <th>Libellé</th>
+                                        <th>Jalon d'origine</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="pdc-jalons-list">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -384,6 +401,7 @@ include __DIR__ . '/includes/header.php';
                                 <tr>
                                     <th>Date</th>
                                     <th>Couleur</th>
+                                    <th>Libellé</th>
                                     <th></th>
                                 </tr>
                             </thead>

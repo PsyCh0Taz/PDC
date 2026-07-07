@@ -20,7 +20,6 @@ class Auth {
             'dn'          => 'cn=taz,ou=ccoa,ou=ec2sa,ou=ba118,ou=users,dc=a,dc=c,dc=d,dc=fr',
             'displayname' => 'Utilisateur Offline',
             'mail'        => 'taz@offline.local',
-            'groups'      => array(),
         );
 
         // Charger les rôles depuis MySQL
@@ -62,7 +61,7 @@ class Auth {
     public static function loadRoles($username) {
         $db   = Database::getInstance();
         $rows = $db->fetchAll(
-            'SELECT role_dn, role FROM utilisateurs_roles WHERE username = ?',
+            'SELECT role_dn, role FROM pdc_utilisateurs_roles WHERE username = ?',
             array($username)
         );
         $roles = array();

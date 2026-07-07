@@ -699,6 +699,53 @@
             updateJalonReferencesAll();
         });
 
+        // Jalons - Afficher/Masquer le tableau
+        $(document).on('click', '.pdc-jalons-toggle-btn', function() {
+            var projetId = $(this).data('projet-id');
+            var $container = $('.pdc-jalons-table-container[data-projet-id="' + projetId + '"]');
+            var $btn = $(this);
+            var $icon = $btn.find('i');
+            
+            if ($container.is(':visible')) {
+                $container.slideUp(300);
+                $btn.removeClass('active');
+                $icon.removeClass('fa-angles-up').addClass('fa-angles-down');
+            } else {
+                // Remplir le tableau avec les jalons triés
+                var $frise = $('.pdc-frise[data-projet-id="' + projetId + '"]');
+                var jalons = $frise.data('jalons') || [];
+                
+                // Trier les jalons par date
+                jalons = jalons.sort(function(a, b) {
+                    return new Date(a.date_jalon) - new Date(b.date_jalon);
+                });
+                
+                // Remplir le tableau
+                var $tbody = $container.find('.pdc-jalons-list');
+                $tbody.empty();
+                jalons.forEach(function(jalon) {
+                    var date = convertToFrench(jalon.date_jalon);
+                    var couleur = jalon.couleur || 'vert';
+                    var libelle = jalon.libelle || '';
+                    var jalonRef = '--';
+                    if (jalon.jalon_reference_id) {
+                        var refJalon = jalons.find(function(j) { return j.id == jalon.jalon_reference_id; });
+                        jalonRef = refJalon ? refJalon.libelle : jalon.jalon_reference_id;
+                    }
+                    
+                    var $tr = $('<tr></tr>');
+                    $tr.append('<td>' + date + '</td>');
+                    $tr.append('<td><span class="badge" style="background-color: var(--pdc-' + couleur + ')">' + couleur + '</span></td>');
+                    $tr.append('<td>' + (libelle ? libelle : '(vide)') + '</td>');
+                    $tr.append('<td>' + jalonRef + '</td>');
+                    $tbody.append($tr);
+                });
+                
+                $container.slideDown(300);
+                $btn.addClass('active');
+                $icon.removeClass('fa-angles-down').addClass('fa-angles-up');
+            }
+        });
     }
 
     function updateJalonReferencesAll() {
@@ -759,6 +806,7 @@
     function addGradientRow(data) {
         var date = data ? convertToFrench(data.date_gradient) : '';
         var couleur = data ? data.couleur : 'vert';
+        var libelle = data ? data.libelle : '';
 
         var $tr = $('<tr></tr>');
         $tr.append('<td><input type="text" class="form-control gradient-date" value="' + date + '" required></td>');
@@ -768,6 +816,7 @@
             '<option value="orange"' + (couleur === 'orange' ? ' selected' : '') + '>Orange</option>' +
             '<option value="rouge"' + (couleur === 'rouge' ? ' selected' : '') + '>Rouge</option>' +
             '</select></td>');
+        $tr.append('<td><input type="text" class="form-control gradient-libelle" value="' + libelle + '"></td>');
         $tr.append('<td><button type="button" class="btn btn-sm btn-danger btn-remove-gradient"><i class="fa-solid fa-trash-can"></i></button></td>');
         $('#gradients-list').append($tr);
 
@@ -827,8 +876,9 @@
         $('#gradients-list tr').each(function() {
             var date = convertToISO($(this).find('.gradient-date').val());
             var couleur = $(this).find('.gradient-couleur').val();
+            var libelle = $(this).find('.gradient-libelle').val();
             if (date && couleur) {
-                gradients.push({ date: date, couleur: couleur });
+                gradients.push({ date: date, couleur: couleur, libelle: libelle });
             }
         });
 

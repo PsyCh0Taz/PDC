@@ -12,7 +12,7 @@ class ShareLink {
         $db    = Database::getInstance();
         $token = bin2hex(random_bytes(32)); // 64 chars hex
         $db->insert(
-            'INSERT INTO share_links (token, url_params, created_by) VALUES (?, ?, ?)',
+            'INSERT INTO pdc_share_links (token, url_params, created_by) VALUES (?, ?, ?)',
             array($token, $urlParams, $createdBy)
         );
         return $token;
@@ -24,7 +24,7 @@ class ShareLink {
     public static function getByToken($token) {
         $token = preg_replace('/[^a-f0-9]/', '', $token);
         $db    = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM share_links WHERE token = ?', array($token));
+        return $db->fetchOne('SELECT * FROM pdc_share_links WHERE token = ?', array($token));
     }
 
     /**

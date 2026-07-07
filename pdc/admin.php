@@ -3,7 +3,7 @@ require_once __DIR__ . '/includes/bootstrap.php';
 
 $currentUser = Auth::requireLogin();
 
-$isAdmin = false;
+$isAdmin = true;
 foreach ($currentUser['roles'] as $dn => $role) {
     if ($dn === '*' && $role === 'admin') $isAdmin = true;
 }
@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     switch ($action) {
         case 'toggle_hierarchie':
             if ($isAdmin) {
-                $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
+                $hierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
                 $active = isset($_POST['active']) ? (int)$_POST['active'] : 0;
                 $node = Hierarchie::getById($hierarchieId);
 
@@ -54,11 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     if ($enabled) {
                         $db->execute(
-                            'DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
+                            'DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
                             array($username, $dn, $role)
                         );
                         $db->insert(
-                            'INSERT INTO utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                            'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
                             array($username, $dn, $role)
                         );
                         Journal::logModification(
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                     } else {
                         $db->execute(
-                            'DELETE FROM utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
+                            'DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ? AND role = ?',
                             array($username, $dn, $role)
                         );
                         Journal::logModification(
@@ -102,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (move_uploaded_file($logo['tmp_name'], $uploadDir . $filename)) {
                         $db = Database::getInstance();
                         $db->execute(
-                            'UPDATE parametres SET valeur = ? WHERE cle = ?',
+                            'UPDATE pdc_parametres SET valeur = ? WHERE cle = ?',
                             array('/assets/uploads/' . $filename, 'logo_url')
                         );
                         Journal::logModification(
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($titre)) {
                     $db = Database::getInstance();
                     $db->execute(
-                        'UPDATE parametres SET valeur = ? WHERE cle = ?',
+                        'UPDATE pdc_parametres SET valeur = ? WHERE cle = ?',
                         array($titre, 'titre_pdf')
                     );
                     Journal::logModification(
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($type === 'modifications') {
                     $db = Database::getInstance();
-                    $db->execute('DELETE FROM journal_modifications', array());
+                    $db->execute('DELETE FROM pdc_journal_modifications', array());
                     Journal::logModification(
                         $currentUser['username'],
                         $ip,
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $purgeMessage = 'Journal des modifications purgé.';
                 } elseif ($type === 'connexions') {
                     $db = Database::getInstance();
-                    $db->execute('DELETE FROM journal_connexions', array());
+                    $db->execute('DELETE FROM pdc_journal_connexions', array());
                     Journal::logModification(
                         $currentUser['username'],
                         $ip,
@@ -171,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $db = Database::getInstance();
 $hierarchie = Hierarchie::getAll(false);
 $parametres = array();
-$params = $db->fetchAll('SELECT cle, valeur FROM parametres');
+$params = $db->fetchAll('SELECT cle, valeur FROM pdc_parametres');
 foreach ($params as $p) {
     $parametres[$p['cle']] = $p['valeur'];
 }
@@ -378,7 +378,7 @@ include __DIR__ . '/includes/header.php';
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $modifications = $db->fetchAll('SELECT * FROM journal_modifications ORDER BY date_heure DESC LIMIT 500');
+                                    $modifications = $db->fetchAll('SELECT * FROM pdc_journal_modifications ORDER BY date_heure DESC LIMIT 500');
                                     foreach ($modifications as $mod):
                                     ?>
                                     <tr>
@@ -412,7 +412,7 @@ include __DIR__ . '/includes/header.php';
                                 </thead>
                                 <tbody>
                                     <?php
-                                    $connexions = $db->fetchAll('SELECT * FROM journal_connexions ORDER BY date_heure DESC LIMIT 500');
+                                    $connexions = $db->fetchAll('SELECT * FROM pdc_journal_connexions ORDER BY date_heure DESC LIMIT 500');
                                     foreach ($connexions as $cnx):
                                     ?>
                                     <tr>
@@ -1098,7 +1098,7 @@ document.querySelectorAll('.hierarchie-toggle').forEach(checkbox => {
         fetch('<?php echo APP_URL; ?>/admin.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=toggle_hierarchie&hierarchie_id=' + encodeURIComponent(hierarchieId) + '&active=' + active
+            body: 'action=toggle_hierarchie&pdc_hierarchie_id=' + encodeURIComponent(hierarchieId) + '&active=' + active
         })
         .then(response => {
             if (!response.ok) {

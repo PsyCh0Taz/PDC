@@ -11,7 +11,7 @@ class Journal {
     public static function logConnexion($username, $ip, $viaPartage = false, $token = null) {
         $db = Database::getInstance();
         $db->insert(
-            'INSERT INTO journal_connexions (username, ip, via_partage, share_token) VALUES (?, ?, ?, ?)',
+            'INSERT INTO pdc_journal_connexions (username, ip, via_partage, share_token) VALUES (?, ?, ?, ?)',
             array($username, $ip, $viaPartage ? 1 : 0, $token)
         );
     }
@@ -22,7 +22,7 @@ class Journal {
     public static function logModification($username, $ip, $action, $entite, $entiteId, $description) {
         $db = Database::getInstance();
         $db->insert(
-            'INSERT INTO journal_modifications (username, ip, action, entite, entite_id, description) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO pdc_journal_modifications (username, ip, action, entite, entite_id, description) VALUES (?, ?, ?, ?, ?, ?)',
             array($username, $ip, $action, $entite, $entiteId, $description)
         );
     }
