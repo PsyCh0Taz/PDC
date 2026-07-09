@@ -15,6 +15,7 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/jquery-ui.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <script src="<?php echo APP_URL; ?>/assets/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top pdc-navbar">

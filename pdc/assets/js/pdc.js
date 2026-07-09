@@ -13,11 +13,61 @@
     $(document).ready(function() {
         initTabs();
         initDatepickers();
+        initCommentEditors();
         initFrises();
         initDragDrop();
         initModales();
         initToolbar();
     });
+
+    function initCommentEditors() {
+        if (typeof tinymce === 'undefined') {
+            console.warn('TinyMCE n\'est pas chargé. Les champs de commentaire seront des textarea simples.');
+            return;
+        }
+
+        tinymce.init({
+            selector: '#new-projet-commentaire, #projet-commentaire',
+            license_key: 'gpl',
+            promotion: false,
+            skin: true,
+            content_css: false,
+            menubar: false,
+            branding: false,
+            statusbar: false,
+            height: 180,
+            plugins: '',
+            toolbar: 'undo redo | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | blockquote | removeformat',
+            content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
+        });
+    }
+
+    function setCommentFieldValue(selector, value) {
+        var content = value || '';
+
+        if (typeof tinymce !== 'undefined') {
+            var targetId = selector.replace('#', '');
+            var editor = tinymce.get(targetId);
+            if (editor) {
+                editor.setContent(content);
+                return;
+            }
+        }
+
+        $(selector).val(content);
+    }
+
+    function getCommentFieldValue(selector) {
+        if (typeof tinymce !== 'undefined') {
+            var targetId = selector.replace('#', '');
+            var editor = tinymce.get(targetId);
+            if (editor) {
+                return editor.getContent();
+            }
+        }
+
+        return $(selector).val();
+    }
 
     // ---- Datepickers jQuery UI ----
     function initDatepickers() {
@@ -727,6 +777,7 @@
                     var date = convertToFrench(jalon.date_jalon);
                     var couleur = jalon.couleur || 'vert';
                     var libelle = jalon.libelle || '';
+                    var commentaire = jalon.commentaire || '';
                     var jalonRef = '--';
                     if (jalon.jalon_reference_id) {
                         var refJalon = jalons.find(function(j) { return j.id == jalon.jalon_reference_id; });
@@ -738,6 +789,7 @@
                     $tr.append('<td><span class="badge" style="background-color: var(--pdc-' + couleur + ')">' + couleur + '</span></td>');
                     $tr.append('<td>' + (libelle ? libelle : '(vide)') + '</td>');
                     $tr.append('<td>' + jalonRef + '</td>');
+                    $tr.append('<td>' + (commentaire ? commentaire : '') + '</td>');
                     $tbody.append($tr);
                 });
                 
@@ -785,6 +837,7 @@
         $('#projet-titre').val(projet.titre);
         $('#projet-date-debut').val(convertToFrench(projet.date_debut));
         $('#projet-date-fin').val(convertToFrench(projet.date_fin));
+        setCommentFieldValue('#projet-commentaire', projet.commentaire || '');
 
         // Stocker les listes pour les références ultérieures
         PDC_CURRENT_JALONS = jalons;
@@ -865,6 +918,7 @@
         var titre = $('#projet-titre').val().trim();
         var dateDebut = convertToISO($('#projet-date-debut').val());
         var dateFin = convertToISO($('#projet-date-fin').val());
+        var commentaire = (getCommentFieldValue('#projet-commentaire') || '').trim();
 
         if (!titre || !dateDebut || !dateFin) {
             alert('Tous les champs sont requis.');
@@ -912,6 +966,7 @@
             titre: titre,
             date_debut: dateDebut,
             date_fin: dateFin,
+            commentaire: commentaire,
             gradients: JSON.stringify(gradients),
             jalons: JSON.stringify(jalons),
         }, function(data) {
@@ -963,8 +1018,27 @@
                 alert('Sélectionnez un niveau de hiérarchie à exporter.');
                 return;
             }
+
+            $('#export-include-gradients').prop('checked', true);
+            $('#export-include-jalons').prop('checked', true);
+            $('#modal-export-pdf-options').modal('show');
+        });
+
+        $('#btn-confirm-export-pdf').on('click', function() {
+            if (!PDC.id || parseInt(PDC.id, 10) <= 0) {
+                alert('Sélectionnez un niveau de hiérarchie à exporter.');
+                return;
+            }
+
+            var includeGradients = $('#export-include-gradients').is(':checked');
+            var includeJalons = $('#export-include-jalons').is(':checked');
+
             var params = 'niveau=hierarchie&id=' + PDC.id;
             params += '&date_debut=' + PDC.dateDebut + '&date_fin=' + PDC.dateFin;
+            params += '&include_gradients=' + (includeGradients ? '1' : '0');
+            params += '&include_jalons=' + (includeJalons ? '1' : '0');
+
+            $('#modal-export-pdf-options').modal('hide');
             window.open(PDC.appUrl + '/export_pdf.php?' + params, '_blank');
         });
     }

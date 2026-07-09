@@ -87,6 +87,9 @@ include __DIR__ . '/includes/header.php';
                             <?php echo htmlspecialchars(Helper::formatDate($projet['date_debut']), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars(Helper::formatDate($projet['date_fin']), ENT_QUOTES, 'UTF-8'); ?>
                         </span>
                     </div>
+                    <?php if (!empty($projet['commentaire'])): ?>
+                    <div class="pdc-projet-commentaire"><?php echo $projet['commentaire']; ?></div>
+                    <?php endif; ?>
                     <div class="pdc-frise-container">
                         <div class="pdc-frise"
                              data-projet-id="<?php echo (int)$projet['id']; ?>"

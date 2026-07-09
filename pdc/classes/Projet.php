@@ -5,21 +5,30 @@
 
 class Projet {
 
+    private static $commentColumn = null;
+
     // ----------------------------------------------------------
     // Lecture
     // ----------------------------------------------------------
 
     public static function getById($id) {
         $db = Database::getInstance();
-        return $db->fetchOne('SELECT * FROM pdc_projets WHERE id = ?', array((int)$id));
+        $row = $db->fetchOne('SELECT * FROM pdc_projets WHERE id = ?', array((int)$id));
+        return self::normalizeProjetRow($row);
     }
 
     public static function getByDomaine($domaineId) {
         $db = Database::getInstance();
-        return $db->fetchAll(
+        $rows = $db->fetchAll(
             'SELECT * FROM pdc_projets WHERE domaine_id = ? ORDER BY ordre ASC, id ASC',
             array((int)$domaineId)
         );
+
+        foreach ($rows as &$row) {
+            $row = self::normalizeProjetRow($row);
+        }
+
+        return $rows;
     }
 
     public static function getGradients($projetId) {
@@ -42,7 +51,7 @@ class Projet {
     // Création
     // ----------------------------------------------------------
 
-    public static function create($domaineId, $titre, $dateDebut, $dateFin) {
+    public static function create($domaineId, $titre, $dateDebut, $dateFin, $commentaire = '') {
         $db = Database::getInstance();
 
         // Ordre : à la fin
@@ -51,6 +60,14 @@ class Projet {
             array((int)$domaineId)
         );
         $ordre = $last ? (int)$last['m'] + 1 : 0;
+
+        $commentColumn = self::getCommentColumn();
+        if ($commentColumn !== null) {
+            return $db->insert(
+                'INSERT INTO pdc_projets (domaine_id, titre, date_debut, date_fin, ' . $commentColumn . ', ordre) VALUES (?, ?, ?, ?, ?, ?)',
+                array((int)$domaineId, self::sanitizeStr($titre), $dateDebut, $dateFin, self::sanitizeCommentaire($commentaire), $ordre)
+            );
+        }
 
         return $db->insert(
             'INSERT INTO pdc_projets (domaine_id, titre, date_debut, date_fin, ordre) VALUES (?, ?, ?, ?, ?)',
@@ -62,8 +79,17 @@ class Projet {
     // Mise à jour
     // ----------------------------------------------------------
 
-    public static function update($id, $titre, $dateDebut, $dateFin) {
+    public static function update($id, $titre, $dateDebut, $dateFin, $commentaire = '') {
         $db = Database::getInstance();
+
+        $commentColumn = self::getCommentColumn();
+        if ($commentColumn !== null) {
+            return $db->execute(
+                'UPDATE pdc_projets SET titre = ?, date_debut = ?, date_fin = ?, ' . $commentColumn . ' = ? WHERE id = ?',
+                array(self::sanitizeStr($titre), $dateDebut, $dateFin, self::sanitizeCommentaire($commentaire), (int)$id)
+            );
+        }
+
         return $db->execute(
             'UPDATE pdc_projets SET titre = ?, date_debut = ?, date_fin = ? WHERE id = ?',
             array(self::sanitizeStr($titre), $dateDebut, $dateFin, (int)$id)
@@ -192,8 +218,159 @@ class Projet {
         return htmlspecialchars(trim($s), ENT_QUOTES, 'UTF-8');
     }
 
+    private static function sanitizeCommentaire($s) {
+        $html = trim((string)$s);
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', '', $html);
+        $allowedTags = '<p><br><strong><b><em><i><u><s><strike><sub><sup><ul><ol><li><a><blockquote><h1><h2><h3><h4><h5><h6><span><div>';
+        $html = strip_tags($html, $allowedTags);
+
+        // Retirer les attributs inline dangereux.
+        $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+        $html = preg_replace('/\s(href)\s*=\s*("|\')\s*javascript:[^"\']*("|\')/i', ' $1="#"', $html);
+        $html = preg_replace('/\s(href)\s*=\s*javascript:[^\s>]*/i', ' $1="#"', $html);
+
+        // Assainir les styles inline en conservant uniquement les propriétés de formatage texte.
+        $html = preg_replace_callback('/\sstyle\s*=\s*("([^"]*)"|\'([^\']*)\')/i', function($m) {
+            $rawStyle = isset($m[2]) && $m[2] !== '' ? $m[2] : (isset($m[3]) ? $m[3] : '');
+            $safeDeclarations = array();
+
+            $allowedProperties = array(
+                'text-align',
+                'color',
+                'background-color',
+                'font-weight',
+                'font-style',
+                'text-decoration'
+            );
+
+            $parts = explode(';', $rawStyle);
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part === '' || strpos($part, ':') === false) {
+                    continue;
+                }
+
+                list($prop, $value) = array_map('trim', explode(':', $part, 2));
+                $prop = strtolower($prop);
+                $valueLower = strtolower($value);
+
+                if (!in_array($prop, $allowedProperties, true)) {
+                    continue;
+                }
+
+                if (preg_match('/expression\s*\(|javascript:|vbscript:|url\s*\(|@import|behavior\s*:/i', $valueLower)) {
+                    continue;
+                }
+
+                if ($prop === 'text-align' && !preg_match('/^(left|right|center|justify)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'font-weight' && !preg_match('/^(normal|bold|[1-9]00)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'font-style' && !preg_match('/^(normal|italic|oblique)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'text-decoration' && !preg_match('/^(none|underline|line-through)$/i', $value)) {
+                    continue;
+                }
+
+                if (($prop === 'color' || $prop === 'background-color') && !preg_match('/^(#[0-9a-f]{3,8}|rgb\([0-9\s,\.]+\)|rgba\([0-9\s,\.]+\)|hsl\([0-9\s,%\.]+\)|hsla\([0-9\s,%\.]+\)|[a-z]+)$/i', $value)) {
+                    continue;
+                }
+
+                $safeDeclarations[] = $prop . ': ' . $value;
+            }
+
+            if (empty($safeDeclarations)) {
+                return '';
+            }
+
+            return ' style="' . implode('; ', $safeDeclarations) . '"';
+        }, $html);
+
+        // Garder uniquement href/target/rel sur les liens.
+        $html = preg_replace_callback('/<a\b[^>]*>/i', function($m) {
+            $tag = $m[0];
+            $attrs = array();
+
+            if (preg_match('/\shref\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $href)) {
+                $hrefValue = trim($href[1], "\"'");
+                if (!preg_match('/^\s*javascript:/i', $hrefValue)) {
+                    $attrs[] = 'href="' . htmlspecialchars($hrefValue, ENT_QUOTES, 'UTF-8') . '"';
+                }
+            }
+
+            if (preg_match('/\starget\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $target)) {
+                $targetValue = trim($target[1], "\"'");
+                if (in_array($targetValue, array('_blank', '_self'), true)) {
+                    $attrs[] = 'target="' . $targetValue . '"';
+                }
+            }
+
+            if (preg_match('/\srel\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $rel)) {
+                $relValue = trim($rel[1], "\"'");
+                if ($relValue !== '') {
+                    $attrs[] = 'rel="' . htmlspecialchars($relValue, ENT_QUOTES, 'UTF-8') . '"';
+                }
+            }
+
+            if (in_array('target="_blank"', $attrs, true) && !preg_grep('/^rel="/i', $attrs)) {
+                $attrs[] = 'rel="noopener noreferrer"';
+            }
+
+            return '<a' . (empty($attrs) ? '' : ' ' . implode(' ', $attrs)) . '>';
+        }, $html);
+
+        return $html;
+    }
+
     private static function sanitizeCouleur($c) {
         $allowed = array('vert','jaune','orange','rouge');
         return in_array($c, $allowed) ? $c : 'vert';
+    }
+
+    private static function getCommentColumn() {
+        if (self::$commentColumn !== null) {
+            return self::$commentColumn;
+        }
+
+        $db = Database::getInstance();
+        $candidates = array('commentaire', 'commentaires', 'comment', 'pdc_commentaire');
+
+        foreach ($candidates as $candidate) {
+            $row = $db->fetchOne("SHOW COLUMNS FROM pdc_projets LIKE ?", array($candidate));
+            if (!empty($row)) {
+                self::$commentColumn = $candidate;
+                return self::$commentColumn;
+            }
+        }
+
+        self::$commentColumn = null;
+        return self::$commentColumn;
+    }
+
+    private static function normalizeProjetRow($row) {
+        if (!$row) {
+            return $row;
+        }
+
+        if (!isset($row['commentaire'])) {
+            $commentColumn = self::getCommentColumn();
+            if ($commentColumn !== null && isset($row[$commentColumn])) {
+                $row['commentaire'] = $row[$commentColumn];
+            } else {
+                $row['commentaire'] = '';
+            }
+        }
+
+        return $row;
     }
 }

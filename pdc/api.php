@@ -54,7 +54,7 @@ try {
         // ---- Domaines ----
 
         case 'create_domaine':
-            $hierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
+            $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
             if (empty($nom)) throw new Exception('Nom requis');
             if ($hierarchieId <= 0) throw new Exception('Niveau de hiérarchie invalide');
@@ -75,7 +75,7 @@ try {
         case 'update_domaine':
             $id  = isset($_POST['id']) ? (int)$_POST['id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
-            $newHierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
+            $newHierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
             if (empty($nom)) throw new Exception('Nom requis');
 
             $currentHierarchieId = $getHierarchyIdByDomaine($id);
@@ -150,6 +150,7 @@ try {
             $titre = isset($_POST['titre']) ? trim($_POST['titre']) : '';
             $dateDebut = isset($_POST['date_debut']) ? $_POST['date_debut'] : '';
             $dateFin = isset($_POST['date_fin']) ? $_POST['date_fin'] : '';
+            $commentaire = isset($_POST['commentaire']) ? trim($_POST['commentaire']) : '';
 
             if (empty($titre) || empty($dateDebut) || empty($dateFin)) {
                 throw new Exception('Données manquantes');
@@ -159,7 +160,7 @@ try {
             if ($hierarchieId <= 0) throw new Exception('Domaine introuvable');
             if (!$userHasMinRoleOnHierarchy($hierarchieId, 'modificateur')) throw new Exception('Accès refusé');
 
-            $id = Projet::create($domaineId, $titre, $dateDebut, $dateFin);
+            $id = Projet::create($domaineId, $titre, $dateDebut, $dateFin, $commentaire);
             Journal::logModification(
                 $currentUser['username'],
                 Journal::getIp(),
@@ -196,6 +197,7 @@ try {
             $titre = isset($_POST['titre']) ? trim($_POST['titre']) : '';
             $dateDebut = isset($_POST['date_debut']) ? $_POST['date_debut'] : '';
             $dateFin = isset($_POST['date_fin']) ? $_POST['date_fin'] : '';
+            $commentaire = isset($_POST['commentaire']) ? trim($_POST['commentaire']) : '';
 
             if (empty($titre) || empty($dateDebut) || empty($dateFin)) {
                 throw new Exception('Données manquantes');
@@ -205,7 +207,7 @@ try {
             if ($hierarchieId <= 0) throw new Exception('Projet introuvable');
             if (!$userHasMinRoleOnHierarchy($hierarchieId, 'modificateur')) throw new Exception('Accès refusé');
 
-            Projet::update($id, $titre, $dateDebut, $dateFin);
+            Projet::update($id, $titre, $dateDebut, $dateFin, $commentaire);
 
             // Gradients
             $gradients = isset($_POST['gradients']) ? json_decode($_POST['gradients'], true) : array();

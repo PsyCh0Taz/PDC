@@ -228,6 +228,9 @@ include __DIR__ . '/includes/header.php';
                             </button>
                         </div>
                         <div class="pdc-jalons-table-container" data-projet-id="<?php echo $projet['id']; ?>" style="display: none;">
+                            <?php if (!empty($projet['commentaire'])): ?>
+                            <div class="pdc-projet-commentaire"><?php echo $projet['commentaire']; ?></div>
+                            <?php endif; ?>                            
                             <table class="table table-sm table-bordered">
                                 <thead>
                                     <tr>
@@ -235,6 +238,7 @@ include __DIR__ . '/includes/header.php';
                                         <th>Couleur</th>
                                         <th>Libellé</th>
                                         <th>Jalon d'origine</th>
+                                        <th>Commentaire</th>
                                     </tr>
                                 </thead>
                                 <tbody class="pdc-jalons-list">
@@ -320,7 +324,7 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Modale : Ajouter un projet -->
 <div class="modal fade" id="modal-add-projet" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Créer un projet</h4>
@@ -345,6 +349,10 @@ include __DIR__ . '/includes/header.php';
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group">
+                            <label for="new-projet-commentaire">Commentaire</label>
+                            <textarea class="form-control" id="new-projet-commentaire" rows="4"></textarea>
+                        </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" id="btn-add-projet"><i class="fa-solid fa-floppy-disk"></i> Enregistrer</button>
@@ -355,7 +363,7 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Modale : Éditer un projet -->
 <div class="modal fade" id="modal-edit-projet" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Modifier le projet</h4>
@@ -388,6 +396,10 @@ include __DIR__ . '/includes/header.php';
                                     <input type="text" class="form-control pdc-datepicker" id="projet-date-fin" required>
                                 </div>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="projet-commentaire">Commentaire</label>
+                            <textarea class="form-control" id="projet-commentaire" rows="4"></textarea>
                         </div>
                     </div>
 
@@ -441,6 +453,35 @@ include __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <?php if ($canShareExportCurrentLevel): ?>
+<!-- Modale : Options export PDF -->
+<div class="modal fade" id="modal-export-pdf-options" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title"><i class="fa-regular fa-file-pdf"></i> Options d'export PDF</h4>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Choisissez les elements a afficher dans l'export.</p>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="export-include-gradients" checked>
+                    <label class="form-check-label" for="export-include-gradients">Afficher les gradients</label>
+                </div>
+                <div class="form-check" style="margin-top: 8px;">
+                    <input class="form-check-input" type="checkbox" id="export-include-jalons" checked>
+                    <label class="form-check-label" for="export-include-jalons">Afficher les jalons</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-success" id="btn-confirm-export-pdf">
+                    <i class="fa-regular fa-file-pdf"></i> Generer le PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modale : Générer lien de partage -->
 <div class="modal fade" id="modal-share" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -508,6 +549,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('new-projet-titre').value = '';
             document.getElementById('new-projet-date-debut').value = '';
             document.getElementById('new-projet-date-fin').value = '';
+            document.getElementById('new-projet-commentaire').value = '';
+            if (typeof tinymce !== 'undefined' && tinymce.get('new-projet-commentaire')) {
+                tinymce.get('new-projet-commentaire').setContent('');
+            }
             // Afficher la modale
             var modal = new bootstrap.Modal(document.getElementById('modal-add-projet'));
             modal.show();
@@ -521,6 +566,10 @@ document.addEventListener('DOMContentLoaded', function() {
             var titre = document.getElementById('new-projet-titre').value.trim();
             var dateDebut = convertDateToISO(document.getElementById('new-projet-date-debut').value);
             var dateFin = convertDateToISO(document.getElementById('new-projet-date-fin').value);
+            var commentaire = document.getElementById('new-projet-commentaire').value.trim();
+            if (typeof tinymce !== 'undefined' && tinymce.get('new-projet-commentaire')) {
+                commentaire = tinymce.get('new-projet-commentaire').getContent().trim();
+            }
 
             if (!titre || !dateDebut || !dateFin) {
                 alert('Veuillez remplir tous les champs');
@@ -539,6 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('titre', titre);
             formData.append('date_debut', dateDebut);
             formData.append('date_fin', dateFin);
+            formData.append('commentaire', commentaire);
 
             fetch(PDC.appUrl + '/api.php', {
                 method: 'POST',

@@ -1,0 +1,98 @@
+/* =============================================================================
+   TIR118 - Styles personnalisés
+   ============================================================================= */
+
+/* ── Navbar ─────────────────────────────────────────────────────────────────── */
+.navbar-brand {
+    letter-spacing: 1px;
+}
+
+/* ── Carousel page d'accueil ─────────────────────────────────────────────────── */
+.carousel-slide-content {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+    min-height: 340px;
+    display: flex;
+    align-items: center;
+}
+
+#articleCarousel .carousel-control-prev-icon,
+#articleCarousel .carousel-control-next-icon {
+    filter: invert(0%);
+}
+
+.article-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ── Calendrier ──────────────────────────────────────────────────────────────── */
+#calendar {
+    background: #fff;
+    padding: 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+.fc-event {
+    cursor: pointer;
+    font-size: .8rem;
+}
+
+.event-complet {
+    opacity: .6;
+    text-decoration: line-through;
+}
+
+/* ── Tableaux admin ──────────────────────────────────────────────────────────── */
+.btn-xs {
+    padding: .1rem .35rem;
+    font-size: .75rem;
+    line-height: 1.4;
+    border-radius: .2rem;
+}
+
+/* ── Badge statut ────────────────────────────────────────────────────────────── */
+.badge {
+    font-size: .8em;
+}
+
+/* ── Cards dashboard ─────────────────────────────────────────────────────────── */
+.card .display-4 {
+    font-size: 2.5rem;
+}
+
+/* ── Responsive images dans les tableaux ─────────────────────────────────────── */
+.img-thumbnail {
+    max-width: 60px;
+    max-height: 45px;
+    object-fit: cover;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────────── */
+.footer {
+    font-size: .85rem;
+}
+
+/* ── Formulaires ─────────────────────────────────────────────────────────────── */
+.form-control:focus {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 .2rem rgba(220,53,69,.25);
+}
+
+/* ── Couleur d'accentuation danger ──────────────────────────────────────────── */
+.bg-danger-soft {
+    background-color: rgba(220,53,69,.08);
+}
+
+/* ── Alertes fixes (pas d'impact sur le flux) ─────────────────────────────────── */
+.alert {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    z-index: 1050;
+    border-radius: 0;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
