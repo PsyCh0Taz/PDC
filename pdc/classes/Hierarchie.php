@@ -262,7 +262,7 @@ class Hierarchie {
 
     private static function hasDomaines($id) {
         $db = Database::getInstance();
-        $row = $db->fetchOne('SELECT COUNT(*) AS c FROM pdc_domaines WHERE pdc_hierarchie_id = ?', array((int)$id));
+        $row = $db->fetchOne('SELECT COUNT(*) AS c FROM pdc_domaines WHERE hierarchie_id = ?', array((int)$id));
         return $row ? ((int)$row['c'] > 0) : false;
     }
 
@@ -278,7 +278,7 @@ class Hierarchie {
 
     private static function deleteDomainesAndProjectsByLevel($levelId) {
         $db = Database::getInstance();
-        $domaines = $db->fetchAll('SELECT id FROM pdc_domaines WHERE pdc_hierarchie_id = ?', array((int)$levelId));
+        $domaines = $db->fetchAll('SELECT id FROM pdc_domaines WHERE hierarchie_id = ?', array((int)$levelId));
 
         foreach ($domaines as $domaine) {
             $domaineId = (int)$domaine['id'];
@@ -343,17 +343,17 @@ class Hierarchie {
     public static function getDomainesByLevel($hierarchieId) {
         $db = Database::getInstance();
         return $db->fetchAll(
-            'SELECT * FROM pdc_domaines WHERE pdc_hierarchie_id = ? ORDER BY ordre ASC, nom ASC',
+            'SELECT * FROM pdc_domaines WHERE hierarchie_id = ? ORDER BY ordre ASC, nom ASC',
             array((int)$hierarchieId)
         );
     }
 
     public static function createDomaine($hierarchieId, $nom) {
         $db = Database::getInstance();
-        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM pdc_domaines WHERE pdc_hierarchie_id = ?', array((int)$hierarchieId));
+        $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM pdc_domaines WHERE hierarchie_id = ?', array((int)$hierarchieId));
         $ordre = $last ? (int)$last['m'] + 1 : 0;
         return $db->insert(
-            'INSERT INTO pdc_domaines (pdc_hierarchie_id, nom, ordre) VALUES (?, ?, ?)',
+            'INSERT INTO pdc_domaines (hierarchie_id, nom, ordre) VALUES (?, ?, ?)',
             array((int)$hierarchieId, self::sanitize($nom), $ordre)
         );
     }
@@ -361,7 +361,7 @@ class Hierarchie {
     private static function normalizeDomainesOrderByHierarchy($hierarchieId) {
         $db = Database::getInstance();
         $domaines = $db->fetchAll(
-            'SELECT id FROM pdc_domaines WHERE pdc_hierarchie_id = ? ORDER BY ordre ASC, id ASC',
+            'SELECT id FROM pdc_domaines WHERE hierarchie_id = ? ORDER BY ordre ASC, id ASC',
             array((int)$hierarchieId)
         );
 
@@ -380,12 +380,12 @@ class Hierarchie {
         $pdo = $db->getPdo();
 
         $id = (int)$id;
-        $existing = $db->fetchOne('SELECT id, pdc_hierarchie_id FROM pdc_domaines WHERE id = ?', array($id));
+        $existing = $db->fetchOne('SELECT id, hierarchie_id FROM pdc_domaines WHERE id = ?', array($id));
         if (!$existing) {
             throw new Exception('Domaine introuvable');
         }
 
-        $currentHierarchyId = (int)$existing['pdc_hierarchie_id'];
+        $currentHierarchyId = (int)$existing['hierarchie_id'];
         $targetHierarchyId = ($hierarchieId === null || (int)$hierarchieId <= 0)
             ? $currentHierarchyId
             : (int)$hierarchieId;
@@ -404,11 +404,11 @@ class Hierarchie {
 
         $pdo->beginTransaction();
         try {
-            $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM pdc_domaines WHERE pdc_hierarchie_id = ?', array($targetHierarchyId));
+            $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM pdc_domaines WHERE hierarchie_id = ?', array($targetHierarchyId));
             $targetOrder = ($last && $last['m'] !== null) ? ((int)$last['m'] + 1) : 0;
 
             $db->execute(
-                'UPDATE pdc_domaines SET nom = ?, pdc_hierarchie_id = ?, ordre = ? WHERE id = ?',
+                'UPDATE pdc_domaines SET nom = ?, hierarchie_id = ?, ordre = ? WHERE id = ?',
                 array(self::sanitize($nom), $targetHierarchyId, $targetOrder, $id)
             );
 

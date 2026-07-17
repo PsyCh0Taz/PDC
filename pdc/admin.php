@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     switch ($action) {
         case 'toggle_hierarchie':
             if ($isAdmin) {
-                $hierarchieId = isset($_POST['pdc_hierarchie_id']) ? (int)$_POST['pdc_hierarchie_id'] : 0;
+                $hierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
                 $active = isset($_POST['active']) ? (int)$_POST['active'] : 0;
                 $node = Hierarchie::getById($hierarchieId);
 
@@ -1098,7 +1098,7 @@ document.querySelectorAll('.hierarchie-toggle').forEach(checkbox => {
         fetch('<?php echo APP_URL; ?>/admin.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=toggle_hierarchie&pdc_hierarchie_id=' + encodeURIComponent(hierarchieId) + '&active=' + active
+            body: 'action=toggle_hierarchie&hierarchie_id=' + encodeURIComponent(hierarchieId) + '&active=' + active
         })
         .then(response => {
             if (!response.ok) {

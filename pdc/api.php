@@ -35,17 +35,17 @@ $userHasMinRoleOnHierarchy = function($hierarchieId, $minRole) use ($currentUser
 
 $getHierarchyIdByDomaine = function($domaineId) {
     $db = Database::getInstance();
-    $row = $db->fetchOne('SELECT pdc_hierarchie_id FROM pdc_domaines WHERE id = ?', array((int)$domaineId));
-    return $row ? (int)$row['pdc_hierarchie_id'] : 0;
+    $row = $db->fetchOne('SELECT hierarchie_id FROM pdc_domaines WHERE id = ?', array((int)$domaineId));
+    return $row ? (int)$row['hierarchie_id'] : 0;
 };
 
 $getHierarchyIdByProjet = function($projetId) {
     $db = Database::getInstance();
     $row = $db->fetchOne(
-        'SELECT d.pdc_hierarchie_id FROM pdc_projets p INNER JOIN pdc_domaines d ON d.id = p.domaine_id WHERE p.id = ?',
+        'SELECT d.hierarchie_id FROM pdc_projets p INNER JOIN pdc_domaines d ON d.id = p.domaine_id WHERE p.id = ?',
         array((int)$projetId)
     );
-    return $row ? (int)$row['pdc_hierarchie_id'] : 0;
+    return $row ? (int)$row['hierarchie_id'] : 0;
 };
 
 try {

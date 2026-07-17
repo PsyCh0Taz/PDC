@@ -11,7 +11,7 @@ define('DB_PASS',     'pdc_user');
 define('DB_CHARSET',     'utf8mb4');
 
 // Mode Offline (pour développement/test)
-define('OFFLINE_MODE',     false);
+define('OFFLINE_MODE',     true);
 
 // LDAP
 define('LDAP_HOST',     '192.168.1.2');
@@ -30,3 +30,7 @@ define('SESSION_LIFETIME',        7200);
 
 // Fuseau horaire
 date_default_timezone_set('Europe/Paris');
+
+// Dev
+ini_set("display_errors",1);
+error_reporting(E_ALL);
