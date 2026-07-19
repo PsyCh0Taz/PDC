@@ -20,10 +20,6 @@ if ($id && empty($tmpHierarchie)) {
     $tmpRevHierarchie = null;
 }
 
-$hierarchieItems = $id
-    ? (!empty($tmpHierarchie[0]['subItems']) ? $tmpHierarchie[0]['subItems'] : array())
-    : $tmpHierarchie;
-
 $currentLevelScope = $id > 0 ? ('hierarchie:' . $id) : null;
 $currentLevelRole = ($id > 0 && isset($currentUser['roles'][$currentLevelScope])) ? $currentUser['roles'][$currentLevelScope] : null;
 $canReadCurrentLevel = ($id > 0) && (
@@ -69,7 +65,50 @@ function flattenHierarchyForSelect(array $nodes, $depth = 0, array $allowedIds =
     return $result;
 }
 
-$editableHierarchyOptions = flattenHierarchyForSelect(Hierarchie::getAll(false), 0, $editableHierarchyIds);
+$allHierarchy = Hierarchie::getAll(false);
+$editableHierarchyOptions = flattenHierarchyForSelect($allHierarchy, 0, $editableHierarchyIds);
+
+function renderHierarchySidebarTree(array $nodes, array $userRoles, array $roleRank, $isAdmin, $activeId, $dateDebut, $dateFin) {
+    $html = '<ul class="pdc-hierarchy-sidebar-tree">';
+
+    foreach ($nodes as $node) {
+        $nodeId = (int)$node['id'];
+        $scope = 'hierarchie:' . $nodeId;
+        $nodeRole = isset($userRoles[$scope]) ? $userRoles[$scope] : null;
+
+        $state = 'inaccessible';
+        if ($isAdmin || $nodeRole === 'modificateur') {
+            $state = 'modifiable';
+        } elseif ($nodeRole === 'lecteur') {
+            $state = 'readonly';
+        }
+
+        $classes = array('pdc-hierarchy-sidebar-item', 'is-' . $state);
+        if ($nodeId === (int)$activeId) {
+            $classes[] = 'is-active';
+        }
+
+        $html .= '<li class="' . implode(' ', $classes) . '">';
+        $html .= '<i class="fa-solid fa-diagram-project"></i> ';
+
+        $label = htmlspecialchars($node['nom'], ENT_QUOTES, 'UTF-8');
+        if ($state === 'inaccessible') {
+            $html .= '<span>' . $label . '</span>';
+        } else {
+            $url = '?id=' . $nodeId . '&date_debut=' . urlencode($dateDebut) . '&date_fin=' . urlencode($dateFin);
+            $html .= '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">' . $label . '</a>';
+        }
+
+        if (!empty($node['subItems'])) {
+            $html .= renderHierarchySidebarTree($node['subItems'], $userRoles, $roleRank, $isAdmin, $activeId, $dateDebut, $dateFin);
+        }
+
+        $html .= '</li>';
+    }
+
+    $html .= '</ul>';
+    return $html;
+}
 
 // Période affichée
 $aujourdhui = new DateTime();
@@ -113,62 +152,40 @@ include __DIR__ . '/includes/header.php';
 
 <div class="container-fluid pdc-container">
 
-    <div class="pdc-topbar">
-        <ol class="breadcrumb pdc-breadcrumb pdc-breadcrumb-inline">
-            <?php foreach ($breadcrumb as $b): ?> 
-                <li><a href="<?php echo htmlspecialchars($b['link'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8'); ?></a></li>
-            <?php endforeach; ?>
-        </ol>
+    <div class="pdc-page-layout" id="pdc-page-layout">
+        <aside class="pdc-sidebar">
+            <div class="pdc-sidebar-tools">
+                <form id="periode_form" method="get" class="pdc-periode-form pdc-sidebar-periode-form">
+                    <?php if ($id): ?>
+                    <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
+                    <?php endif; ?>
 
-        <div class="pdc-topbar-actions">
-            <form id="periode_form" method="get" class="form-inline pdc-periode-form pdc-periode-form-inline">
-                <?php if ($id): ?>
-                <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
-                <?php endif; ?>
+                    <div class="form-group">
+                        <label for="date_debut"><i class="fa-regular fa-calendar"></i> Du</label>
+                        <input type="text" class="form-control pdc-datepicker" name="date_debut" id="date_debut" value="<?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?>" required>
+                        <label for="date_fin">Au</label>
+                        <input type="text" class="form-control pdc-datepicker" name="date_fin" id="date_fin" value="<?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?>" required>
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Actualiser</button>
+                    </div>
+                </form>
 
-                <div class="form-group">
-                    <label><i class="fa-regular fa-calendar"></i> Du</label>
-                    <input type="text" class="form-control pdc-datepicker" name="date_debut" id="date_debut" value="<?php echo htmlspecialchars(Helper::formatDate($dateDebut), ENT_QUOTES, 'UTF-8'); ?>" required>
-                    <label>&nbsp;au&nbsp;</label>
-                    <input type="text" class="form-control pdc-datepicker" name="date_fin" id="date_fin" value="<?php echo htmlspecialchars(Helper::formatDate($dateFin), ENT_QUOTES, 'UTF-8'); ?>" required>
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-arrows-rotate"></i> Actualiser</button>
-                </div>
-            </form>
-
-            <div class="pdc-topbar-buttons">
                 <?php if ($canShareExportCurrentLevel): ?>
-                <button class="btn btn-info" id="btn-share" title="Générer un lien de partage">
-                    <i class="fa-regular fa-share-from-square"></i> Partager
-                </button>
-                <button class="btn btn-success" id="btn-export-pdf" title="Exporter en PDF">
-                    <i class="fa-regular fa-file-pdf"></i> Export PDF
-                </button>
+                <div class="pdc-sidebar-buttons">
+                    <button class="btn btn-info" id="btn-share" title="Générer un lien de partage">
+                        <i class="fa-regular fa-share-from-square"></i> Partager
+                    </button>
+                    <button class="btn btn-success" id="btn-export-pdf" title="Exporter en PDF">
+                        <i class="fa-regular fa-file-pdf"></i> Export PDF
+                    </button>
+                </div>
                 <?php endif; ?>
             </div>
-        </div>
-    </div>
 
-    <div class="pdc-content" id="pdc-content">
-        <div class="pdc-items-list">
-                <?php if (!empty($hierarchieItems)): ?>
-                <?php foreach ( $hierarchieItems as $item): ?>
-                <?php $subLevelCount = !empty($item['subItems']) ? count($item['subItems']) : 0; ?>
-                <div class="pdc-card">
-                    <h3>
-                        <a href="?id=<?php echo $item['id']; ?>&date_debut=<?php echo urlencode($dateDebut); ?>&date_fin=<?php echo urlencode($dateFin); ?>">
-                            <i class="fa-solid fa-diagram-project"></i>
-                            <?php echo htmlspecialchars($item['nom'], ENT_QUOTES, 'UTF-8'); ?>
-                            <?php if ($subLevelCount > 0): ?>
-                            <span class="badge bg-secondary" style="display:table; margin:6px 0 0 auto; font-size:0.7rem; padding:0.2rem 0.45rem; line-height:1;">
-                                <?php echo $subLevelCount; ?> sous-niveau<?php echo ($subLevelCount > 1 ? 'x' : ''); ?>
-                            </span>
-                            <?php endif; ?>
-                        </a>
-                    </h3>
-                </div>
-                <?php endforeach; ?>
-                <?php endif; ?>
-        </div>
+            <div class="pdc-sidebar-title"><i class="fa-solid fa-sitemap"></i> Niveaux</div>
+            <?php echo renderHierarchySidebarTree($allHierarchy, $currentUser['roles'], $roleRank, $isAdmin, $id, $dateDebut, $dateFin); ?>
+        </aside>
+
+        <div class="pdc-content" id="pdc-content">
 
         <?php if ($showNoReadAlert): ?>
         <br>
@@ -273,6 +290,7 @@ include __DIR__ . '/includes/header.php';
                 </button>
             </div>
             <?php endif; ?>
+        </div>
         </div>
     </div>
 

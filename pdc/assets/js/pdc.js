@@ -13,6 +13,7 @@
 
     // ---- Initialisation ----
     $(document).ready(function() {
+        initSidebarToggle();
         initTabs();
         initDatepickers();
         initCommentEditors();
@@ -21,6 +22,42 @@
         initModales();
         initToolbar();
     });
+
+    function initSidebarToggle() {
+        var $layout = $('#pdc-page-layout');
+        var $toggle = $('#btn-toggle-sidebar');
+        if (!$layout.length || !$toggle.length) {
+            return;
+        }
+
+        var storageKey = 'pdc.sidebar.collapsed';
+        var applyState = function(collapsed) {
+            $layout.toggleClass('is-sidebar-collapsed', collapsed);
+            $toggle.attr('aria-expanded', collapsed ? 'false' : 'true');
+        };
+
+        var isCollapsed = false;
+        try {
+            isCollapsed = window.localStorage && window.localStorage.getItem(storageKey) === '1';
+        } catch (e) {
+            isCollapsed = false;
+        }
+
+        applyState(isCollapsed);
+
+        $toggle.on('click', function() {
+            var collapsed = !$layout.hasClass('is-sidebar-collapsed');
+            applyState(collapsed);
+
+            try {
+                if (window.localStorage) {
+                    window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+                }
+            } catch (e) {
+                // Ignore storage failures.
+            }
+        });
+    }
 
     function initCommentEditors() {
         if (typeof tinymce === 'undefined') {

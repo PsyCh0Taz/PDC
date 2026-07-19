@@ -22,6 +22,11 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
     <div class="container-fluid">
         <div class="pdc-navbar-shell">
             <div class="pdc-navbar-main">
+                <?php if (isset($id)): ?>
+                <button type="button" class="btn btn-outline-light pdc-navbar-sidebar-toggle" id="btn-toggle-sidebar" aria-expanded="true" title="Replier/afficher la sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <?php endif; ?>
                 <?php if (!empty($breadcrumb) && is_array($breadcrumb)): ?>
                 <div class="navbar-brand pdc-navbar-brand-trail">
                     <ol class="breadcrumb pdc-navbar-breadcrumb">
