@@ -16,6 +16,7 @@
     // ---- Initialisation ----
     $(document).ready(function() {
         initSidebarToggle();
+        initHierarchySunburst();
         initTabs();
         initDatepickers();
         initCommentEditors();
@@ -39,10 +40,21 @@
         };
 
         var isCollapsed = false;
+        var hasStoredState = false;
         try {
-            isCollapsed = window.localStorage && window.localStorage.getItem(storageKey) === '1';
+            if (window.localStorage) {
+                var storedState = window.localStorage.getItem(storageKey);
+                hasStoredState = storedState !== null;
+                if (hasStoredState) {
+                    isCollapsed = storedState === '1';
+                }
+            }
         } catch (e) {
             isCollapsed = false;
+        }
+
+        if (!hasStoredState && typeof PDC !== 'undefined' && parseInt(PDC.id, 10) <= 0) {
+            isCollapsed = true;
         }
 
         applyState(isCollapsed);
@@ -58,6 +70,255 @@
             } catch (e) {
                 // Ignore storage failures.
             }
+        });
+    }
+
+    function initHierarchySunburst() {
+        var $host = $('#pdc-sunburst');
+        if (!$host.length || typeof PDC === 'undefined' || !Array.isArray(PDC.hierarchyTree)) {
+            return;
+        }
+
+        var rootNode = {
+            id: 0,
+            name: 'Plan de charge',
+            state: 'readonly',
+            children: PDC.hierarchyTree,
+            url: ''
+        };
+
+        var stack = [rootNode];
+
+        function isAccessible(node) {
+            return node && node.state !== 'inaccessible';
+        }
+
+        function nodeWeight(node) {
+            if (!node || !node.children || !node.children.length) {
+                return 1;
+            }
+
+            var total = 0;
+            node.children.forEach(function(child) {
+                total += nodeWeight(child);
+            });
+
+            return Math.max(1, total);
+        }
+
+        function maxDepth(node, depth) {
+            if (!node || !node.children || !node.children.length) {
+                return depth;
+            }
+
+            var max = depth;
+            node.children.forEach(function(child) {
+                max = Math.max(max, maxDepth(child, depth + 1));
+            });
+
+            return max;
+        }
+
+        function polar(cx, cy, r, angle) {
+            return {
+                x: cx + (r * Math.cos(angle)),
+                y: cy + (r * Math.sin(angle))
+            };
+        }
+
+        function arcPath(cx, cy, innerR, outerR, startA, endA) {
+            var p1 = polar(cx, cy, outerR, startA);
+            var p2 = polar(cx, cy, outerR, endA);
+            var p3 = polar(cx, cy, innerR, endA);
+            var p4 = polar(cx, cy, innerR, startA);
+            var largeArc = (endA - startA) > Math.PI ? 1 : 0;
+
+            return [
+                'M', p1.x, p1.y,
+                'A', outerR, outerR, 0, largeArc, 1, p2.x, p2.y,
+                'L', p3.x, p3.y,
+                'A', innerR, innerR, 0, largeArc, 0, p4.x, p4.y,
+                'Z'
+            ].join(' ');
+        }
+
+        function fillFor(node, depth) {
+            if (!node || node.state === 'inaccessible') {
+                return '#d1d5db';
+            }
+            if (node.state === 'readonly') {
+                return depth % 2 === 0 ? '#94a3b8' : '#a8b7c8';
+            }
+            return depth % 2 === 0 ? '#2c5aa0' : '#3a6fbf';
+        }
+
+        function getSegmentLabel(node, availablePx) {
+            var name = (node && node.name ? String(node.name) : '').trim();
+            if (!name) {
+                return '';
+            }
+
+            var maxChars = Math.max(4, Math.floor(availablePx / 7));
+            if (name.length <= maxChars) {
+                return name;
+            }
+
+            return name.substring(0, Math.max(1, maxChars - 1)) + '…';
+        }
+
+        function buildBreadcrumb(nodeStack) {
+            return nodeStack.map(function(node) {
+                return escapeHtml(node.name || 'Niveau');
+            }).join(' / ');
+        }
+
+        function render() {
+            $host.empty();
+
+            var current = stack[stack.length - 1];
+            var hostWidth = Math.max(320, Math.floor($host.innerWidth() || 720));
+            var size = Math.min(760, hostWidth);
+            var center = size / 2;
+            var outerR = (size / 2) - 18;
+            var depthCount = Math.max(1, maxDepth(current, 0));
+            var coreR = 62;
+            var ringW = Math.max(28, Math.floor((outerR - coreR) / depthCount));
+
+            var $crumb = $('<div class="pdc-sunburst-breadcrumb"></div>').html(buildBreadcrumb(stack));
+            $host.append($crumb);
+
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.setAttribute('viewBox', '0 0 ' + size + ' ' + size);
+            svg.setAttribute('class', 'pdc-sunburst-svg');
+
+            function drawLevel(nodes, depth, startA, endA) {
+                if (!nodes || !nodes.length) {
+                    return;
+                }
+
+                var totalWeight = 0;
+                nodes.forEach(function(node) {
+                    totalWeight += nodeWeight(node);
+                });
+
+                var cursor = startA;
+                nodes.forEach(function(node) {
+                    var weight = nodeWeight(node);
+                    var angle = (endA - startA) * (weight / totalWeight);
+                    var a0 = cursor;
+                    var a1 = cursor + angle;
+                    cursor = a1;
+
+                    var innerR = coreR + ((depth - 1) * ringW);
+                    var outerRLocal = innerR + ringW - 2;
+
+                    var path = document.createElementNS(svgNs, 'path');
+                    path.setAttribute('d', arcPath(center, center, innerR, outerRLocal, a0, a1));
+                    path.setAttribute('fill', fillFor(node, depth));
+                    path.setAttribute('stroke', '#fff');
+                    path.setAttribute('stroke-width', '1');
+                    var segmentClass = 'pdc-sunburst-segment';
+                    if (isAccessible(node)) {
+                        segmentClass += ' is-accessible';
+                        segmentClass += (node.state === 'modifiable' ? ' is-modifiable' : ' is-readonly');
+                    } else {
+                        segmentClass += ' is-locked';
+                    }
+                    path.setAttribute('class', segmentClass);
+
+                    var title = document.createElementNS(svgNs, 'title');
+                    title.textContent = (node.name || 'Niveau') + (node.state === 'inaccessible' ? ' (inaccessible)' : '');
+                    path.appendChild(title);
+
+                    path.addEventListener('click', function(evt) {
+                        evt.stopPropagation();
+                        if (!isAccessible(node)) {
+                            return;
+                        }
+
+                        if ((evt.ctrlKey || evt.metaKey) && node.children && node.children.length) {
+                            stack.push(node);
+                            render();
+                            return;
+                        }
+
+                        if (node.url) {
+                            window.location.href = node.url;
+                        }
+                    });
+
+                    svg.appendChild(path);
+
+                    var arcAngle = a1 - a0;
+                    var midAngle = a0 + (arcAngle / 2);
+                    var textRadius = innerR + ((outerRLocal - innerR) / 2);
+                    var textPos = polar(center, center, textRadius, midAngle);
+                    var availableArcPx = arcAngle * textRadius;
+                    var label = getSegmentLabel(node, availableArcPx);
+
+                    if (label && arcAngle >= 0.18 && availableArcPx >= 32) {
+                        var text = document.createElementNS(svgNs, 'text');
+                        var rotationDeg = (midAngle * 180 / Math.PI);
+                        if (rotationDeg > 90 && rotationDeg < 270) {
+                            rotationDeg += 180;
+                        }
+
+                        text.setAttribute('x', textPos.x);
+                        text.setAttribute('y', textPos.y);
+                        text.setAttribute('text-anchor', 'middle');
+                        text.setAttribute('dominant-baseline', 'middle');
+                        text.setAttribute('transform', 'rotate(' + rotationDeg + ' ' + textPos.x + ' ' + textPos.y + ')');
+                        text.setAttribute('class', 'pdc-sunburst-segment-label' + (node.state === 'inaccessible' ? ' is-locked' : ''));
+                        text.textContent = label;
+                        svg.appendChild(text);
+                    }
+
+                    if (node.children && node.children.length) {
+                        drawLevel(node.children, depth + 1, a0, a1);
+                    }
+                });
+            }
+
+            drawLevel(current.children || [], 1, -Math.PI / 2, (Math.PI * 3) / 2);
+
+            var core = document.createElementNS(svgNs, 'circle');
+            core.setAttribute('cx', center);
+            core.setAttribute('cy', center);
+            core.setAttribute('r', coreR - 4);
+            core.setAttribute('class', 'pdc-sunburst-core');
+            svg.appendChild(core);
+
+            var coreTitle = document.createElementNS(svgNs, 'text');
+            coreTitle.setAttribute('x', center);
+            coreTitle.setAttribute('y', center - 6);
+            coreTitle.setAttribute('text-anchor', 'middle');
+            coreTitle.setAttribute('class', 'pdc-sunburst-core-title');
+            coreTitle.textContent = (current.name || 'Niveau');
+            svg.appendChild(coreTitle);
+
+            var coreHint = document.createElementNS(svgNs, 'text');
+            coreHint.setAttribute('x', center);
+            coreHint.setAttribute('y', center + 14);
+            coreHint.setAttribute('text-anchor', 'middle');
+            coreHint.setAttribute('class', 'pdc-sunburst-core-hint');
+            coreHint.textContent = stack.length > 1 ? 'Cliquer pour remonter' : 'Ctrl-Clic pour descendre';
+            svg.appendChild(coreHint);
+
+            core.addEventListener('click', function(evt) {
+                evt.stopPropagation();
+                if (stack.length > 1) {
+                    stack.pop();
+                    render();
+                }
+            });
+
+            $host.append(svg);
+        }
+
+        render();
+        $(window).on('resize.pdcSunburst', function() {
+            render();
         });
     }
 

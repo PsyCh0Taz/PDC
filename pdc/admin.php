@@ -388,7 +388,7 @@ include __DIR__ . '/includes/header.php';
                                     <tr>
                                         <td><?php echo htmlspecialchars($mod['date_heure'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars($mod['username'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><span class="badge badge-info"><?php echo htmlspecialchars($mod['action'], ENT_QUOTES, 'UTF-8'); ?></span></td>
+                                        <td><?php echo htmlspecialchars($mod['action'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><?php echo htmlspecialchars($mod['description'], ENT_QUOTES, 'UTF-8'); ?></td>
                                         <td><code><?php echo htmlspecialchars($mod['ip'], ENT_QUOTES, 'UTF-8'); ?></code></td>
                                     </tr>

@@ -69,6 +69,40 @@ $allHierarchy = Hierarchie::getAll(false);
 $editableHierarchyOptions = flattenHierarchyForSelect($allHierarchy, 0, $editableHierarchyIds);
 $domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
 $showNoDomainReadOnlyAlert = ($id > 0) && $canReadCurrentLevel && !$canModifyCurrentLevel && empty($domainesList);
+$showNoDomainEditableAlert = ($id > 0) && $canModifyCurrentLevel && empty($domainesList);
+
+function buildSunburstTreeData(array $nodes, array $userRoles, array $roleRank, $dateDebut, $dateFin) {
+    $result = array();
+
+    foreach ($nodes as $node) {
+        $nodeId = (int)$node['id'];
+        $scope = 'hierarchie:' . $nodeId;
+        $nodeRole = isset($userRoles[$scope]) ? strtolower(trim((string)$userRoles[$scope])) : null;
+        $nodeRank = ($nodeRole !== null && isset($roleRank[$nodeRole])) ? (int)$roleRank[$nodeRole] : 0;
+        $nodeIsActive = !isset($node['actif']) || (int)$node['actif'] === 1;
+
+        $state = 'inaccessible';
+        if ($nodeIsActive && $nodeRank >= 2) {
+            $state = 'modifiable';
+        } elseif ($nodeIsActive && $nodeRank >= 1) {
+            $state = 'readonly';
+        }
+
+        $children = !empty($node['subItems'])
+            ? buildSunburstTreeData($node['subItems'], $userRoles, $roleRank, $dateDebut, $dateFin)
+            : array();
+
+        $result[] = array(
+            'id' => $nodeId,
+            'name' => $node['nom'],
+            'state' => $state,
+            'url' => '?id=' . $nodeId . '&date_debut=' . urlencode($dateDebut) . '&date_fin=' . urlencode($dateFin),
+            'children' => $children,
+        );
+    }
+
+    return $result;
+}
 
 function renderHierarchySidebarTree(array $nodes, array $userRoles, array $roleRank, $isAdmin, $activeId, $dateDebut, $dateFin) {
     $html = '<ul class="pdc-hierarchy-sidebar-tree">';
@@ -140,6 +174,8 @@ if ($moisCourant >= 1 && $moisCourant <= 4) {
 $dateDebut = isset($_GET['date_debut']) ? $_GET['date_debut'] : $quadStart;
 $dateFin   = isset($_GET['date_fin'])   ? $_GET['date_fin']   : $quadEnd;
 
+$sunburstHierarchyData = buildSunburstTreeData($allHierarchy, $currentUser['roles'], $roleRank, $dateDebut, $dateFin);
+
 
 
 // Breadcrumb
@@ -208,6 +244,20 @@ include __DIR__ . '/includes/header.php';
             Ce niveau ne contient actuellement aucun domaine et vous n'avez pas les droits de modification.
         </div>
         <?php endif; ?>
+        <?php if ($showNoDomainEditableAlert): ?>
+        <br>
+        <div class="alert alert-info" role="alert" style="margin-bottom: 15px;">
+            <i class="fa-solid fa-circle-info"></i>
+            Ce niveau ne contient actuellement aucun domaine. Vous pouvez en ajouter un avec le bouton "+".
+        </div>
+        <?php endif; ?>
+            <?php if ((int)$id === 0): ?>
+            <section class="pdc-sunburst-overview">
+                <div id="pdc-sunburst" class="pdc-sunburst-canvas" aria-label="Drill-down Sunburst"></div>
+            </section>
+            <?php endif; ?>
+
+            <?php if ((int)$id > 0): ?>
             <div id="domaines-container" class="pdc-domaines-container">
             <?php 
                 foreach ($domainesList as $domaine):
@@ -303,6 +353,7 @@ include __DIR__ . '/includes/header.php';
             </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
         </div>
     </div>
 
@@ -548,6 +599,8 @@ var PDC = {
     hierarchieId: <?php echo (int)$id; ?>,
     currentProjetId: null,
     currentDomaineId: null,
+    isRootSelection: <?php echo ((int)$id === 0 ? 'true' : 'false'); ?>,
+    hierarchyTree: <?php echo json_encode($sunburstHierarchyData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
 };
 
 // Création de projet - Convertir dates du format français (dd/mm/yyyy) au format ISO (yyyy-mm-dd)
