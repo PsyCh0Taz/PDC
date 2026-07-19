@@ -403,7 +403,7 @@ class Hierarchie {
             if ($commentColumn !== null) {
                 return $db->execute(
                     'UPDATE pdc_domaines SET nom = ?, ' . $commentColumn . ' = ? WHERE id = ?',
-                    array(self::sanitize($nom), self::sanitize($commentaire), $id)
+                    array(self::sanitize($nom), self::sanitizeCommentaire($commentaire), $id)
                 );
             }
 
@@ -426,7 +426,7 @@ class Hierarchie {
             if ($commentColumn !== null) {
                 $db->execute(
                     'UPDATE pdc_domaines SET nom = ?, hierarchie_id = ?, ordre = ?, ' . $commentColumn . ' = ? WHERE id = ?',
-                    array(self::sanitize($nom), $targetHierarchyId, $targetOrder, self::sanitize($commentaire), $id)
+                    array(self::sanitize($nom), $targetHierarchyId, $targetOrder, self::sanitizeCommentaire($commentaire), $id)
                 );
             } else {
                 $db->execute(
@@ -464,6 +464,126 @@ class Hierarchie {
 
     private static function sanitize($s) {
         return htmlspecialchars(trim($s), ENT_QUOTES, 'UTF-8');
+    }
+
+    private static function sanitizeCommentaire($s) {
+        $html = trim((string)$s);
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('#<(script|style)\b[^>]*>.*?</\1>#is', '', $html);
+        $allowedTags = '<p><br><strong><b><em><i><u><s><strike><sub><sup><ul><ol><li><a><blockquote><h1><h2><h3><h4><h5><h6><span><div>';
+        $html = strip_tags($html, $allowedTags);
+
+        $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+        $html = preg_replace('/\s(href)\s*=\s*("|\')\s*javascript:[^"\']*("|\')/i', ' $1="#"', $html);
+        $html = preg_replace('/\s(href)\s*=\s*javascript:[^\s>]*/i', ' $1="#"', $html);
+
+        $html = preg_replace_callback('/\sstyle\s*=\s*("([^"]*)"|\'([^\']*)\')/i', function($m) {
+            $rawStyle = isset($m[2]) && $m[2] !== '' ? $m[2] : (isset($m[3]) ? $m[3] : '');
+            $safeDeclarations = array();
+
+            $allowedProperties = array(
+                'text-align',
+                'color',
+                'background-color',
+                'font-weight',
+                'font-style',
+                'text-decoration'
+            );
+
+            $parts = explode(';', $rawStyle);
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part === '' || strpos($part, ':') === false) {
+                    continue;
+                }
+
+                list($prop, $value) = array_map('trim', explode(':', $part, 2));
+                $prop = strtolower($prop);
+                $valueLower = strtolower($value);
+
+                if (!in_array($prop, $allowedProperties, true)) {
+                    continue;
+                }
+
+                if (preg_match('/expression\s*\(|javascript:|vbscript:|url\s*\(|@import|behavior\s*:/i', $valueLower)) {
+                    continue;
+                }
+
+                if ($prop === 'text-align' && !preg_match('/^(left|right|center|justify)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'font-weight' && !preg_match('/^(normal|bold|[1-9]00)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'font-style' && !preg_match('/^(normal|italic|oblique)$/i', $value)) {
+                    continue;
+                }
+
+                if ($prop === 'text-decoration' && !preg_match('/^(none|underline|line-through)$/i', $value)) {
+                    continue;
+                }
+
+                if (($prop === 'color' || $prop === 'background-color') && !preg_match('/^(#[0-9a-f]{3,8}|rgb\([0-9\s,\.]+\)|rgba\([0-9\s,\.]+\)|hsl\([0-9\s,%\.]+\)|hsla\([0-9\s,%\.]+\)|[a-z]+)$/i', $value)) {
+                    continue;
+                }
+
+                $safeDeclarations[] = $prop . ': ' . $value;
+            }
+
+            if (empty($safeDeclarations)) {
+                return '';
+            }
+
+            return ' style="' . implode('; ', $safeDeclarations) . '"';
+        }, $html);
+
+        $html = preg_replace_callback('/<a\b[^>]*>/i', function($m) {
+            $tag = $m[0];
+            $attrs = array();
+
+            if (preg_match('/\shref\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $href)) {
+                $hrefValue = trim($href[1], "\"'");
+                if (!preg_match('/^\s*javascript:/i', $hrefValue)) {
+                    $attrs[] = 'href="' . htmlspecialchars($hrefValue, ENT_QUOTES, 'UTF-8') . '"';
+                }
+            }
+
+            if (preg_match('/\starget\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $target)) {
+                $targetValue = trim($target[1], "\"'");
+                if (in_array($targetValue, array('_blank', '_self'), true)) {
+                    $attrs[] = 'target="' . $targetValue . '"';
+                }
+            }
+
+            if (preg_match('/\srel\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', $tag, $rel)) {
+                $relValue = trim($rel[1], "\"'");
+                if ($relValue !== '') {
+                    $attrs[] = 'rel="' . htmlspecialchars($relValue, ENT_QUOTES, 'UTF-8') . '"';
+                }
+            }
+
+            if (!empty($attrs) && stripos(implode(' ', $attrs), 'target="_blank"') !== false) {
+                $hasRel = false;
+                foreach ($attrs as $attr) {
+                    if (strpos($attr, 'rel=') === 0) {
+                        $hasRel = true;
+                        break;
+                    }
+                }
+                if (!$hasRel) {
+                    $attrs[] = 'rel="noopener noreferrer"';
+                }
+            }
+
+            return '<a' . (!empty($attrs) ? ' ' . implode(' ', $attrs) : '') . '>';
+        }, $html);
+
+        return $html;
     }
 
     private static function getDomaineCommentColumn() {

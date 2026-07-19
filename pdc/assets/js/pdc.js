@@ -10,6 +10,8 @@
     var PDC_CURRENT_GRADIENTS = [];
     var PDC_PENDING_JALON_ID = null;
     var PDC_PENDING_GRADIENT_INDEX = null;
+    var PDC_PENDING_TAB_INDEX = 0;
+    var PDC_PENDING_FOCUS_SELECTOR = null;
 
     // ---- Initialisation ----
     $(document).ready(function() {
@@ -66,7 +68,7 @@
         }
 
         tinymce.init({
-            selector: '#new-projet-commentaire, #projet-commentaire',
+            selector: '#new-projet-commentaire, #projet-commentaire, #domaine-commentaire',
             license_key: 'gpl',
             promotion: false,
             skin: true,
@@ -304,6 +306,21 @@
     }
 
     function applyPendingProjetEditorFocus() {
+        if ($('#projet-tabs').length && PDC_PENDING_TAB_INDEX !== null && typeof PDC_PENDING_TAB_INDEX !== 'undefined') {
+            $('#projet-tabs').tabs('option', 'active', PDC_PENDING_TAB_INDEX);
+        }
+
+        if (PDC_PENDING_FOCUS_SELECTOR) {
+            var $field = $(PDC_PENDING_FOCUS_SELECTOR).first();
+            if ($field.length) {
+                $field.trigger('focus');
+                if ($field[0] && typeof $field[0].setSelectionRange === 'function') {
+                    var fieldValue = $field.val() || '';
+                    $field[0].setSelectionRange(fieldValue.length, fieldValue.length);
+                }
+            }
+        }
+
         if (PDC_PENDING_GRADIENT_INDEX !== null) {
             focusGradientRow(PDC_PENDING_GRADIENT_INDEX);
             return;
@@ -317,6 +334,12 @@
         PDC_PENDING_JALON_ID = target && target.jalonId ? target.jalonId : null;
         PDC_PENDING_GRADIENT_INDEX = target && typeof target.gradientIndex !== 'undefined'
             ? target.gradientIndex
+            : null;
+        PDC_PENDING_TAB_INDEX = target && typeof target.tabIndex !== 'undefined'
+            ? target.tabIndex
+            : 0;
+        PDC_PENDING_FOCUS_SELECTOR = target && target.focusSelector
+            ? target.focusSelector
             : null;
 
         $.post(PDC.appUrl + '/api.php', {
@@ -367,6 +390,8 @@
     }
 
     function renderFrise($frise) {
+        $frise.empty();
+
         var dateDebut = parseISODate($frise.data('date-debut'));
         var dateFin = parseISODate($frise.data('date-fin'));
         var periodeDebut = parseISODate($frise.data('periode-debut'));
@@ -379,7 +404,25 @@
         var visibleFin = dateFin < periodeFin ? dateFin : periodeFin;
 
         if (visibleDebut > periodeFin || visibleFin < periodeDebut) {
-            $frise.html('<p class="text-muted"><em>Hors période</em></p>');
+            var isBeforePeriod = dateFin < periodeDebut;
+            var isAfterPeriod = dateDebut > periodeFin;
+
+            var $outArrow = $('<div class="pdc-frise-arrow pdc-frise-arrow-outside"></div>');
+            $outArrow.css({
+                left: '0%',
+                width: '100%',
+                background: '#d5dde6'
+            });
+
+            if (isBeforePeriod) {
+                $outArrow.addClass('pdc-frise-arrow-before');
+            } else if (isAfterPeriod) {
+                $outArrow.addClass('pdc-frise-arrow-after');
+            }
+
+            $outArrow.attr('title', convertToFrench(dateDebut.toISOString().substr(0,10)) + ' → ' + convertToFrench(dateFin.toISOString().substr(0,10)));
+            $frise.css('min-height', '60px');
+            $frise.append($outArrow);
             return;
         }
 
@@ -790,7 +833,7 @@
             
             PDC.currentDomaineId = domaineId;
             $('#domaine-nom').val(nom);
-            $('#domaine-commentaire').val(commentaire);
+            setCommentFieldValue('#domaine-commentaire', commentaire);
             $('#domaine-hierarchie-id').val(String(parseInt(PDC.hierarchieId, 10) || ''));
             $('#modal-edit-domaine').modal('show');
         });
@@ -810,7 +853,7 @@
 
         $('#btn-save-domaine').on('click', function() {
             var nom = $('#domaine-nom').val().trim();
-            var commentaire = $('#domaine-commentaire').val().trim();
+            var commentaire = (getCommentFieldValue('#domaine-commentaire') || '').trim();
             var hierarchieId = parseInt($('#domaine-hierarchie-id').val(), 10);
             var currentHierarchieId = parseInt(PDC.hierarchieId, 10);
             var hasMoved = !isNaN(currentHierarchieId) && currentHierarchieId > 0 && currentHierarchieId !== hierarchieId;
@@ -925,7 +968,7 @@
         $(document).on('click', '.pdc-edit-projet', function(e) {
             e.preventDefault();
             var projetId = $(this).data('projet-id');
-            openProjetEditor(projetId, null);
+            openProjetEditor(projetId, { tabIndex: 0 });
         });
 
         // Éditer un projet au double-clic sur le titre
@@ -935,9 +978,9 @@
             }
 
             e.preventDefault();
-            var $btn = $(this).closest('.pdc-projet-header').find('.pdc-edit-projet').first();
-            if ($btn.length) {
-                $btn.trigger('click');
+            var projetId = $(this).closest('.pdc-projet').data('projet-id');
+            if (projetId) {
+                openProjetEditor(projetId, { tabIndex: 0, focusSelector: '#projet-titre' });
             }
         });
 
@@ -955,7 +998,24 @@
                 return;
             }
 
-            openProjetEditor(projetId, { jalonId: jalonId });
+            openProjetEditor(projetId, { jalonId: jalonId, tabIndex: 2 });
+        });
+
+        // Éditer un jalon au double-clic sur une ligne du tableau sous la frise
+        $(document).on('dblclick', '.pdc-jalons-list tr', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) {
+                return;
+            }
+
+            e.preventDefault();
+
+            var jalonId = $(this).attr('data-jalon-id') || null;
+            var projetId = $(this).closest('.pdc-jalons-table-container').data('projet-id');
+            if (!projetId) {
+                return;
+            }
+
+            openProjetEditor(projetId, { jalonId: jalonId, tabIndex: 2 });
         });
 
         // Éditer le gradient le plus proche au double-clic sur la frise
@@ -987,9 +1047,9 @@
 
             var $projet = $(this).closest('.pdc-projet');
             if ($projet.length) {
-                var $projetBtn = $projet.find('.pdc-edit-projet').first();
-                if ($projetBtn.length) {
-                    $projetBtn.trigger('click');
+                var projetId = $projet.data('projet-id');
+                if (projetId) {
+                    openProjetEditor(projetId, { tabIndex: 0, focusSelector: '#projet-commentaire' });
                 }
                 return;
             }
@@ -1073,17 +1133,31 @@
                     var couleur = jalon.couleur || 'vert';
                     var libelle = jalon.libelle || '';
                     var commentaire = jalon.commentaire || '';
-                    var jalonRef = '--';
+                    var jalonRefHtml = '--';
+
+                    var makeBadge = function(text, colorCode) {
+                        var badgeText = text ? escapeHtml(text) : '(vide)';
+                        var color = colorCode || 'vert';
+                        var textClass = color === 'jaune' ? ' is-light' : '';
+                        return '<span class="pdc-jalon-color-badge' + textClass + '" style="background-color: var(--pdc-' + color + ')">' + badgeText + '</span>';
+                    };
+
                     if (jalon.jalon_reference_id) {
                         var refJalon = jalons.find(function(j) { return j.id == jalon.jalon_reference_id; });
-                        jalonRef = refJalon ? refJalon.libelle : jalon.jalon_reference_id;
+                        if (refJalon) {
+                            jalonRefHtml = makeBadge(refJalon.libelle || '(vide)', refJalon.couleur || 'vert');
+                        } else {
+                            jalonRefHtml = escapeHtml(String(jalon.jalon_reference_id));
+                        }
                     }
                     
                     var $tr = $('<tr></tr>');
+                    if (jalon.id) {
+                        $tr.attr('data-jalon-id', jalon.id);
+                    }
                     $tr.append('<td>' + date + '</td>');
-                    $tr.append('<td><span class="badge" style="background-color: var(--pdc-' + couleur + ')">' + couleur + '</span></td>');
-                    $tr.append('<td>' + (libelle ? libelle : '(vide)') + '</td>');
-                    $tr.append('<td>' + jalonRef + '</td>');
+                    $tr.append('<td>' + makeBadge(libelle, couleur) + '</td>');
+                    $tr.append('<td>' + jalonRefHtml + '</td>');
                     $tr.append('<td>' + (commentaire ? commentaire : '') + '</td>');
                     $tbody.append($tr);
                 });
@@ -1286,38 +1360,6 @@
 
     // ---- Barre d'outils ----
     function initToolbar() {
-        // Générer un lien de partage
-        $('#btn-share').on('click', function() {
-            if (!PDC.id || parseInt(PDC.id, 10) <= 0) {
-                alert('Sélectionnez un niveau de hiérarchie à partager.');
-                return;
-            }
-            var params = 'niveau=hierarchie&id=' + PDC.id;
-            params += '&date_debut=' + PDC.dateDebut + '&date_fin=' + PDC.dateFin;
-
-            $.post(PDC.appUrl + '/api.php', {
-                action: 'create_share_link',
-                url_params: params,
-            }, function(data) {
-                if (data.success) {
-                    $('#share-url').val(data.url);
-                    $('#modal-share').modal('show');
-                } else {
-                    alert('Erreur : ' + data.error);
-                }
-            }, 'json');
-        });
-
-        $('#btn-copy-share').on('click', function() {
-            var $input = $('#share-url');
-            $input.select();
-            document.execCommand('copy');
-            $(this).find('i').removeClass('fa-clipboard').addClass('fa-check');
-            setTimeout(function() {
-                $('#btn-copy-share i').removeClass('fa-check').addClass('fa-clipboard');
-            }, 2000);
-        });
-
         // Export PDF
         $('#btn-export-pdf').on('click', function() {
             if (!PDC.id || parseInt(PDC.id, 10) <= 0) {

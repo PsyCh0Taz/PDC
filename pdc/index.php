@@ -67,6 +67,8 @@ function flattenHierarchyForSelect(array $nodes, $depth = 0, array $allowedIds =
 
 $allHierarchy = Hierarchie::getAll(false);
 $editableHierarchyOptions = flattenHierarchyForSelect($allHierarchy, 0, $editableHierarchyIds);
+$domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
+$showNoDomainReadOnlyAlert = ($id > 0) && $canReadCurrentLevel && !$canModifyCurrentLevel && empty($domainesList);
 
 function renderHierarchySidebarTree(array $nodes, array $userRoles, array $roleRank, $isAdmin, $activeId, $dateDebut, $dateFin) {
     $html = '<ul class="pdc-hierarchy-sidebar-tree">';
@@ -74,12 +76,20 @@ function renderHierarchySidebarTree(array $nodes, array $userRoles, array $roleR
     foreach ($nodes as $node) {
         $nodeId = (int)$node['id'];
         $scope = 'hierarchie:' . $nodeId;
-        $nodeRole = isset($userRoles[$scope]) ? $userRoles[$scope] : null;
+        $nodeRole = isset($userRoles[$scope]) ? strtolower(trim((string)$userRoles[$scope])) : null;
+        $nodeRank = ($nodeRole !== null && isset($roleRank[$nodeRole])) ? (int)$roleRank[$nodeRole] : 0;
+        $nodeIsActive = !isset($node['actif']) || (int)$node['actif'] === 1;
+
+        //$canReadNode = $nodeIsActive && ($isAdmin || $nodeRank >= 1);
+        //$canModifyNode = $canReadNode && ($isAdmin || $nodeRank >= 2);
+
+        $canReadNode = $nodeIsActive && $nodeRank >= 1;
+        $canModifyNode = $canReadNode && $nodeRank >= 2;
 
         $state = 'inaccessible';
-        if ($isAdmin || $nodeRole === 'modificateur') {
+        if ($canModifyNode) {
             $state = 'modifiable';
-        } elseif ($nodeRole === 'lecteur') {
+        } elseif ($canReadNode) {
             $state = 'readonly';
         }
 
@@ -171,9 +181,6 @@ include __DIR__ . '/includes/header.php';
 
                 <?php if ($canShareExportCurrentLevel): ?>
                 <div class="pdc-sidebar-buttons">
-                    <button class="btn btn-info" id="btn-share" title="Générer un lien de partage">
-                        <i class="fa-regular fa-share-from-square"></i> Partager
-                    </button>
                     <button class="btn btn-success" id="btn-export-pdf" title="Exporter en PDF">
                         <i class="fa-regular fa-file-pdf"></i> Export PDF
                     </button>
@@ -194,9 +201,15 @@ include __DIR__ . '/includes/header.php';
             Vous n'avez pas les droits de lecture des domaines et projets sur ce niveau.
         </div>
         <?php endif; ?>
+        <?php if ($showNoDomainReadOnlyAlert): ?>
+        <br>
+        <div class="alert alert-info" role="alert" style="margin-bottom: 15px;">
+            <i class="fa-solid fa-circle-info"></i>
+            Ce niveau ne contient actuellement aucun domaine et vous n'avez pas les droits de modification.
+        </div>
+        <?php endif; ?>
             <div id="domaines-container" class="pdc-domaines-container">
             <?php 
-                $domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
                 foreach ($domainesList as $domaine):
                 $projets = Projet::getByDomaine($domaine['id']);
             ?>
@@ -264,11 +277,10 @@ include __DIR__ . '/includes/header.php';
                             <table class="table table-sm table-bordered">
                                 <thead>
                                     <tr>
-                                        <th>Date</th>
-                                        <th>Couleur</th>
-                                        <th>Libellé</th>
-                                        <th>Jalon d'origine</th>
-                                        <th>Commentaire</th>
+                                        <th width="20%">Date</th>
+                                        <th width="20%">Libellé</th>
+                                        <th width="20%">Jalon d'origine</th>
+                                        <th width="40%">Commentaire</th>
                                     </tr>
                                 </thead>
                                 <tbody class="pdc-jalons-list">
@@ -286,7 +298,7 @@ include __DIR__ . '/includes/header.php';
             <?php if ($canModifyCurrentLevel): ?>
             <div class="pdc-add-domaine">
                 <button class="btn btn-success btn-lg" id="btn-add-domaine" data-hierarchie-id="<?php echo (int)$id; ?>">
-                    <i class="fa-solid fa-circle-plus"></i> Ajouter un domaine
+                    <i class="fa-solid fa-circle-plus"></i>
                 </button>
             </div>
             <?php endif; ?>
@@ -320,26 +332,32 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Modale : Éditer un domaine -->
 <div class="modal fade" id="modal-edit-domaine" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <h4 class="modal-title">Modifier le domaine</h4>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="domaine-nom">Nom du domaine</label>
-                    <input type="text" class="form-control" id="domaine-nom" required>
-                </div>
-                <div class="form-group">
-                    <label for="domaine-hierarchie-id">Niveau hiérarchique</label>
-                    <select class="form-control" id="domaine-hierarchie-id" required>
-                        <?php foreach ($editableHierarchyOptions as $hierOption): ?>
-                        <option value="<?php echo (int)$hierOption['id']; ?>"<?php echo ((int)$hierOption['id'] === (int)$id ? ' selected' : ''); ?><?php echo (!empty($hierOption['can_edit']) ? '' : ' disabled'); ?>>
-                            <?php echo str_repeat('-- ', (int)$hierOption['depth']) . htmlspecialchars($hierOption['nom'], ENT_QUOTES, 'UTF-8'); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label for="domaine-nom">Nom du domaine</label>
+                            <input type="text" class="form-control" id="domaine-nom" required>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            <label for="domaine-hierarchie-id">Niveau hiérarchique</label>
+                            <select class="form-control" id="domaine-hierarchie-id" required>
+                                <?php foreach ($editableHierarchyOptions as $hierOption): ?>
+                                <option value="<?php echo (int)$hierOption['id']; ?>"<?php echo ((int)$hierOption['id'] === (int)$id ? ' selected' : ''); ?><?php echo (!empty($hierOption['can_edit']) ? '' : ' disabled'); ?>>
+                                    <?php echo str_repeat('-- ', (int)$hierOption['depth']) . htmlspecialchars($hierOption['nom'], ENT_QUOTES, 'UTF-8'); ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="domaine-commentaire">Commentaire</label>
@@ -513,35 +531,6 @@ include __DIR__ . '/includes/header.php';
                 <button type="button" class="btn btn-success" id="btn-confirm-export-pdf">
                     <i class="fa-regular fa-file-pdf"></i> Generer le PDF
                 </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modale : Générer lien de partage -->
-<div class="modal fade" id="modal-share" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title"><i class="fa-solid fa-share-from-square"></i></i> Lien de partage</h4>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Ce lien donne accès en <strong>lecture seule</strong> à la vue courante.</p>
-                <div class="form-group">
-                    <label>URL de partage</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="share-url" readonly>
-                        <span class="input-group-btn">
-                            <button class="btn btn-default" id="btn-copy-share" title="Copier">
-                                <i class="fa-regular fa-copy"></i>
-                            </button>
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-bs-dismiss="modal">00Fermer</button>
             </div>
         </div>
     </div>

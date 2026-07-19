@@ -112,9 +112,6 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
 
                     <div class="pdc-topbar-buttons">
                         <?php if (!empty($canShareExportCurrentLevel)): ?>
-                        <button class="btn btn-info" id="btn-share" title="Générer un lien de partage">
-                            <i class="fa-regular fa-share-from-square"></i> Partager
-                        </button>
                         <button class="btn btn-success" id="btn-export-pdf" title="Exporter en PDF">
                             <i class="fa-regular fa-file-pdf"></i> Export PDF
                         </button>

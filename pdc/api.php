@@ -621,27 +621,6 @@ try {
             echo json_encode(array('success' => true));
             break;
 
-        // ---- Partage ----
-
-        case 'create_share_link':
-            $urlParams = isset($_POST['url_params']) ? $_POST['url_params'] : '';
-
-            $shareParams = array();
-            parse_str($urlParams, $shareParams);
-            $shareHierarchyId = isset($shareParams['id']) ? (int)$shareParams['id'] : 0;
-
-            if ($shareHierarchyId <= 0) {
-                throw new Exception('Niveau de hiérarchie invalide pour le partage');
-            }
-            if (!$userHasMinRoleOnHierarchy($shareHierarchyId, 'lecteur')) {
-                throw new Exception('Accès refusé');
-            }
-
-            $token = ShareLink::create($urlParams, $currentUser['username']);
-            $url = ShareLink::buildUrl($token);
-            echo json_encode(array('success' => true, 'url' => $url));
-            break;
-
         default:
             throw new Exception('Action inconnue');
     }
