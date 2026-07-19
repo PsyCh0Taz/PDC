@@ -183,7 +183,7 @@ include __DIR__ . '/includes/header.php';
                 foreach ($domainesList as $domaine):
                 $projets = Projet::getByDomaine($domaine['id']);
             ?>
-            <div class="pdc-domaine" data-domaine-id="<?php echo $domaine['id']; ?>">
+            <div class="pdc-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" data-domaine-commentaire="<?php echo htmlspecialchars((string)(isset($domaine['commentaire']) ? $domaine['commentaire'] : ''), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="pdc-domaine-header">
                     <h3 class="pdc-domaine-titre">
                         <?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?>
@@ -197,6 +197,9 @@ include __DIR__ . '/includes/header.php';
                         <?php endif; ?>
                     </h3>
                 </div>
+                <?php if (!empty($domaine['commentaire'])): ?>
+                <div class="pdc-commentaire"><?php echo $domaine['commentaire']; ?></div>
+                <?php endif; ?>
                 <div class="pdc-projets-list" data-domaine-id="<?php echo $domaine['id']; ?>">
                     <?php foreach ($projets as $projet):
                         $gradients = Projet::getGradients($projet['id']);
@@ -214,6 +217,9 @@ include __DIR__ . '/includes/header.php';
                             </button>
                             <?php endif; ?>
                         </div>
+                        <?php if (!empty($projet['commentaire'])): ?>
+                        <div class="pdc-commentaire"><?php echo $projet['commentaire']; ?></div>
+                        <?php endif; ?>    
                         <div class="pdc-frise-container">
                             <div class="pdc-frise" data-projet-id="<?php echo $projet['id']; ?>"
                                     data-date-debut="<?php echo $projet['date_debut']; ?>"
@@ -228,9 +234,6 @@ include __DIR__ . '/includes/header.php';
                             </button>
                         </div>
                         <div class="pdc-jalons-table-container" data-projet-id="<?php echo $projet['id']; ?>" style="display: none;">
-                            <?php if (!empty($projet['commentaire'])): ?>
-                            <div class="pdc-projet-commentaire"><?php echo $projet['commentaire']; ?></div>
-                            <?php endif; ?>                            
                             <table class="table table-sm table-bordered">
                                 <thead>
                                     <tr>
@@ -309,6 +312,10 @@ include __DIR__ . '/includes/header.php';
                         </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="domaine-commentaire">Commentaire</label>
+                    <textarea class="form-control" id="domaine-commentaire" rows="4"></textarea>
                 </div>
             </div>
             <div class="modal-footer">

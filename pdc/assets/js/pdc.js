@@ -425,7 +425,7 @@
         // Projets draggables entre domaines
         $('.pdc-projets-list').sortable({
             connectWith: '.pdc-projets-list',
-            handle: '.pdc-projet-header',
+            handle: '.pdc-drag-handle-projet',
             cancel: '.pdc-edit-projet, button, input, select, textarea, a',
             placeholder: 'pdc-projet-placeholder',
             tolerance: 'pointer',
@@ -521,7 +521,7 @@
         // Domaines draggables
         $('#domaines-container').sortable({
             items: '.pdc-domaine',
-            handle: '.pdc-domaine-header',
+            handle: '.pdc-drag-handle-domaine',
             cancel: '.pdc-edit-domaine, .pdc-add-projet, button, input, select, textarea, a',
             tolerance: 'pointer',
             distance: 5,
@@ -571,15 +571,31 @@
             e.preventDefault();
             var domaineId = $(this).data('domaine-id');
             var nom = $(this).closest('.pdc-domaine-header').find('.pdc-domaine-titre').text().trim();
+            var commentaire = $(this).closest('.pdc-domaine').data('domaine-commentaire') || '';
             
             PDC.currentDomaineId = domaineId;
             $('#domaine-nom').val(nom);
+            $('#domaine-commentaire').val(commentaire);
             $('#domaine-hierarchie-id').val(String(parseInt(PDC.hierarchieId, 10) || ''));
             $('#modal-edit-domaine').modal('show');
         });
 
+        // Éditer un domaine au double-clic sur le titre
+        $(document).on('dblclick', '.pdc-domaine-titre', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) {
+                return;
+            }
+
+            e.preventDefault();
+            var $btn = $(this).find('.pdc-edit-domaine').first();
+            if ($btn.length) {
+                $btn.trigger('click');
+            }
+        });
+
         $('#btn-save-domaine').on('click', function() {
             var nom = $('#domaine-nom').val().trim();
+            var commentaire = $('#domaine-commentaire').val().trim();
             var hierarchieId = parseInt($('#domaine-hierarchie-id').val(), 10);
             var currentHierarchieId = parseInt(PDC.hierarchieId, 10);
             var hasMoved = !isNaN(currentHierarchieId) && currentHierarchieId > 0 && currentHierarchieId !== hierarchieId;
@@ -596,6 +612,7 @@
                 action: 'update_domaine',
                 id: PDC.currentDomaineId,
                 nom: nom,
+                commentaire: commentaire,
                 hierarchie_id: hierarchieId,
             }, function(data) {
                 if (data.success) {
@@ -706,6 +723,19 @@
                     alert('Erreur : ' + data.error);
                 }
             }, 'json');
+        });
+
+        // Éditer un projet au double-clic sur le titre
+        $(document).on('dblclick', '.pdc-projet-titre', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) {
+                return;
+            }
+
+            e.preventDefault();
+            var $btn = $(this).closest('.pdc-projet-header').find('.pdc-edit-projet').first();
+            if ($btn.length) {
+                $btn.trigger('click');
+            }
         });
 
         $('#btn-save-projet').on('click', function() {

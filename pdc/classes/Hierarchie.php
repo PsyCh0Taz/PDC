@@ -5,6 +5,8 @@
 
 class Hierarchie {
 
+    private static $domaineCommentColumn = null;
+
     public static function getAll($onlyActive = true) {
         $tArray = self::getSubLevel(0, $onlyActive);
 
@@ -342,10 +344,16 @@ class Hierarchie {
 
     public static function getDomainesByLevel($hierarchieId) {
         $db = Database::getInstance();
-        return $db->fetchAll(
+        $rows = $db->fetchAll(
             'SELECT * FROM pdc_domaines WHERE hierarchie_id = ? ORDER BY ordre ASC, nom ASC',
             array((int)$hierarchieId)
         );
+
+        foreach ($rows as &$row) {
+            $row = self::normalizeDomaineRow($row);
+        }
+
+        return $rows;
     }
 
     public static function createDomaine($hierarchieId, $nom) {
@@ -375,9 +383,10 @@ class Hierarchie {
         }
     }
 
-    public static function updateDomaine($id, $nom, $hierarchieId = null) {
+    public static function updateDomaine($id, $nom, $hierarchieId = null, $commentaire = '') {
         $db = Database::getInstance();
         $pdo = $db->getPdo();
+        $commentColumn = self::getDomaineCommentColumn();
 
         $id = (int)$id;
         $existing = $db->fetchOne('SELECT id, hierarchie_id FROM pdc_domaines WHERE id = ?', array($id));
@@ -391,6 +400,13 @@ class Hierarchie {
             : (int)$hierarchieId;
 
         if ($targetHierarchyId === $currentHierarchyId) {
+            if ($commentColumn !== null) {
+                return $db->execute(
+                    'UPDATE pdc_domaines SET nom = ?, ' . $commentColumn . ' = ? WHERE id = ?',
+                    array(self::sanitize($nom), self::sanitize($commentaire), $id)
+                );
+            }
+
             return $db->execute(
                 'UPDATE pdc_domaines SET nom = ? WHERE id = ?',
                 array(self::sanitize($nom), $id)
@@ -407,10 +423,17 @@ class Hierarchie {
             $last = $db->fetchOne('SELECT MAX(ordre) AS m FROM pdc_domaines WHERE hierarchie_id = ?', array($targetHierarchyId));
             $targetOrder = ($last && $last['m'] !== null) ? ((int)$last['m'] + 1) : 0;
 
-            $db->execute(
-                'UPDATE pdc_domaines SET nom = ?, hierarchie_id = ?, ordre = ? WHERE id = ?',
-                array(self::sanitize($nom), $targetHierarchyId, $targetOrder, $id)
-            );
+            if ($commentColumn !== null) {
+                $db->execute(
+                    'UPDATE pdc_domaines SET nom = ?, hierarchie_id = ?, ordre = ?, ' . $commentColumn . ' = ? WHERE id = ?',
+                    array(self::sanitize($nom), $targetHierarchyId, $targetOrder, self::sanitize($commentaire), $id)
+                );
+            } else {
+                $db->execute(
+                    'UPDATE pdc_domaines SET nom = ?, hierarchie_id = ?, ordre = ? WHERE id = ?',
+                    array(self::sanitize($nom), $targetHierarchyId, $targetOrder, $id)
+                );
+            }
 
             self::normalizeDomainesOrderByHierarchy($currentHierarchyId);
             self::normalizeDomainesOrderByHierarchy($targetHierarchyId);
@@ -441,5 +464,42 @@ class Hierarchie {
 
     private static function sanitize($s) {
         return htmlspecialchars(trim($s), ENT_QUOTES, 'UTF-8');
+    }
+
+    private static function getDomaineCommentColumn() {
+        if (self::$domaineCommentColumn !== null) {
+            return self::$domaineCommentColumn;
+        }
+
+        $db = Database::getInstance();
+        $candidates = array('commentaire', 'commentaires', 'comment', 'pdc_commentaire');
+
+        foreach ($candidates as $candidate) {
+            $row = $db->fetchOne('SHOW COLUMNS FROM pdc_domaines LIKE ?', array($candidate));
+            if (!empty($row)) {
+                self::$domaineCommentColumn = $candidate;
+                return self::$domaineCommentColumn;
+            }
+        }
+
+        self::$domaineCommentColumn = null;
+        return self::$domaineCommentColumn;
+    }
+
+    private static function normalizeDomaineRow($row) {
+        if (!$row) {
+            return $row;
+        }
+
+        if (!isset($row['commentaire'])) {
+            $commentColumn = self::getDomaineCommentColumn();
+            if ($commentColumn !== null && isset($row[$commentColumn])) {
+                $row['commentaire'] = $row[$commentColumn];
+            } else {
+                $row['commentaire'] = '';
+            }
+        }
+
+        return $row;
     }
 }

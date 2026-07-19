@@ -75,6 +75,7 @@ try {
         case 'update_domaine':
             $id  = isset($_POST['id']) ? (int)$_POST['id'] : 0;
             $nom = isset($_POST['nom']) ? trim($_POST['nom']) : '';
+            $commentaire = isset($_POST['commentaire']) ? trim($_POST['commentaire']) : '';
             $newHierarchieId = isset($_POST['hierarchie_id']) ? (int)$_POST['hierarchie_id'] : 0;
             if (empty($nom)) throw new Exception('Nom requis');
 
@@ -93,7 +94,7 @@ try {
                 throw new Exception('Accès refusé');
             }
 
-            Hierarchie::updateDomaine($id, $nom, $newHierarchieId);
+            Hierarchie::updateDomaine($id, $nom, $newHierarchieId, $commentaire);
             Journal::logModification(
                 $currentUser['username'],
                 Journal::getIp(),
