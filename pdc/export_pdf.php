@@ -390,6 +390,7 @@ header('Content-Type: text/html; charset=utf-8');
                             <tr>
                                 <th class="col-date">Date</th>
                                 <th>Libelle</th>
+                                <th>Commentaire</th>
                                 <th class="col-date">Date jalon precedent</th>
                             </tr>
                         </thead>
@@ -407,6 +408,7 @@ header('Content-Type: text/html; charset=utf-8');
                             <tr>
                                 <td class="col-date"><span class="date-badge <?php echo htmlspecialchars($dateColorClass($jalon['couleur']), ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(Helper::formatDate($jalon['date_jalon']), ENT_QUOTES, 'UTF-8'); ?></span></td>
                                 <td><?php echo htmlspecialchars(isset($jalon['libelle']) ? $jalon['libelle'] : '', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo isset($jalon['commentaire']) ? $jalon['commentaire'] : ''; ?></td>
                                 <td class="col-date">
                                     <?php if ($previousDate !== ''): ?>
                                     <span class="date-badge <?php echo htmlspecialchars($previousDateColorClass, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($previousDate, ENT_QUOTES, 'UTF-8'); ?></span>

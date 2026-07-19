@@ -6,6 +6,7 @@
 class Projet {
 
     private static $commentColumn = null;
+    private static $jalonCommentColumn = null;
 
     // ----------------------------------------------------------
     // Lecture
@@ -41,10 +42,16 @@ class Projet {
 
     public static function getJalons($projetId) {
         $db = Database::getInstance();
-        return $db->fetchAll(
+        $rows = $db->fetchAll(
             'SELECT * FROM pdc_projet_jalons WHERE projet_id = ? ORDER BY date_jalon ASC',
             array((int)$projetId)
         );
+
+        foreach ($rows as &$row) {
+            $row = self::normalizeJalonRow($row);
+        }
+
+        return $rows;
     }
 
     // ----------------------------------------------------------
@@ -124,6 +131,7 @@ class Projet {
 
     public static function saveJalons($projetId, $jalons) {
         $db = Database::getInstance();
+        $jalonCommentColumn = self::getJalonCommentColumn();
         $db->execute('DELETE FROM pdc_projet_jalons WHERE projet_id = ?', array((int)$projetId));
 
         // Première passe : créer tous les jalons et maintenir un mapping ancien ID => nouveau ID
@@ -131,17 +139,33 @@ class Projet {
 
         foreach ($jalons as $idx => $j) {
             if (empty($j['date'])) continue;
+
+            $commentaire = isset($j['commentaire']) ? $j['commentaire'] : '';
             
-            $newId = $db->insert(
-                'INSERT INTO pdc_projet_jalons (projet_id, date_jalon, couleur, libelle, jalon_reference_id) VALUES (?, ?, ?, ?, ?)',
-                array(
-                    (int)$projetId,
-                    $j['date'],
-                    self::sanitizeCouleur($j['couleur']),
-                    self::sanitizeStr($j['libelle']),
-                    null // On mettra à jour les références après
-                )
-            );
+            if ($jalonCommentColumn !== null) {
+                $newId = $db->insert(
+                    'INSERT INTO pdc_projet_jalons (projet_id, date_jalon, couleur, libelle, ' . $jalonCommentColumn . ', jalon_reference_id) VALUES (?, ?, ?, ?, ?, ?)',
+                    array(
+                        (int)$projetId,
+                        $j['date'],
+                        self::sanitizeCouleur($j['couleur']),
+                        self::sanitizeStr($j['libelle']),
+                        self::sanitizeCommentaire($commentaire),
+                        null
+                    )
+                );
+            } else {
+                $newId = $db->insert(
+                    'INSERT INTO pdc_projet_jalons (projet_id, date_jalon, couleur, libelle, jalon_reference_id) VALUES (?, ?, ?, ?, ?)',
+                    array(
+                        (int)$projetId,
+                        $j['date'],
+                        self::sanitizeCouleur($j['couleur']),
+                        self::sanitizeStr($j['libelle']),
+                        null
+                    )
+                );
+            }
             
             // Stocker le mapping si le jalon avait un ancien ID
             if (isset($j['id']) && !empty($j['id'])) {
@@ -357,6 +381,26 @@ class Projet {
         return self::$commentColumn;
     }
 
+    private static function getJalonCommentColumn() {
+        if (self::$jalonCommentColumn !== null) {
+            return self::$jalonCommentColumn;
+        }
+
+        $db = Database::getInstance();
+        $candidates = array('commentaire', 'commentaires', 'comment', 'pdc_commentaire');
+
+        foreach ($candidates as $candidate) {
+            $row = $db->fetchOne("SHOW COLUMNS FROM pdc_projet_jalons LIKE ?", array($candidate));
+            if (!empty($row)) {
+                self::$jalonCommentColumn = $candidate;
+                return self::$jalonCommentColumn;
+            }
+        }
+
+        self::$jalonCommentColumn = null;
+        return self::$jalonCommentColumn;
+    }
+
     private static function normalizeProjetRow($row) {
         if (!$row) {
             return $row;
@@ -364,6 +408,23 @@ class Projet {
 
         if (!isset($row['commentaire'])) {
             $commentColumn = self::getCommentColumn();
+            if ($commentColumn !== null && isset($row[$commentColumn])) {
+                $row['commentaire'] = $row[$commentColumn];
+            } else {
+                $row['commentaire'] = '';
+            }
+        }
+
+        return $row;
+    }
+
+    private static function normalizeJalonRow($row) {
+        if (!$row) {
+            return $row;
+        }
+
+        if (!isset($row['commentaire'])) {
+            $commentColumn = self::getJalonCommentColumn();
             if ($commentColumn !== null && isset($row[$commentColumn])) {
                 $row['commentaire'] = $row[$commentColumn];
             } else {

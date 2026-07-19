@@ -186,6 +186,11 @@ include __DIR__ . '/includes/header.php';
             <div class="pdc-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" data-domaine-commentaire="<?php echo htmlspecialchars((string)(isset($domaine['commentaire']) ? $domaine['commentaire'] : ''), ENT_QUOTES, 'UTF-8'); ?>">
                 <div class="pdc-domaine-header">
                     <h3 class="pdc-domaine-titre">
+                        <?php if ($canModifyCurrentLevel): ?>
+                        <span class="pdc-drag-handle pdc-drag-handle-domaine" title="Déplacer le domaine">
+                            <i class="fa-solid fa-grip-lines"></i>
+                        </span>
+                        <?php endif; ?>
                         <?php echo htmlspecialchars($domaine['nom'], ENT_QUOTES, 'UTF-8'); ?>
                         <?php if ($canModifyCurrentLevel): ?>
                         <button class="btn btn-xs btn-link pdc-edit-domaine" data-domaine-id="<?php echo $domaine['id']; ?>" title="Modifier le titre">
@@ -207,6 +212,11 @@ include __DIR__ . '/includes/header.php';
                     ?>
                     <div class="pdc-projet" data-projet-id="<?php echo $projet['id']; ?>">
                         <div class="pdc-projet-header">
+                            <?php if ($canModifyCurrentLevel): ?>
+                            <span class="pdc-drag-handle pdc-drag-handle-projet" title="Déplacer le projet">
+                                <i class="fa-solid fa-grip-lines"></i>
+                            </span>
+                            <?php endif; ?>
                             <span class="pdc-projet-titre"><?php echo htmlspecialchars($projet['titre'], ENT_QUOTES, 'UTF-8'); ?></span>
                             <span class="badge bg-secondary pdc-projet-periode-badge">
                                 <?php echo htmlspecialchars(Helper::formatDate($projet['date_debut']), ENT_QUOTES, 'UTF-8'); ?> - <?php echo htmlspecialchars(Helper::formatDate($projet['date_fin']), ENT_QUOTES, 'UTF-8'); ?>
@@ -439,6 +449,7 @@ include __DIR__ . '/includes/header.php';
                                     <th>Date</th>
                                     <th>Couleur</th>
                                     <th>Libellé</th>
+                                    <th>Commentaire</th>
                                     <th>Jalon d'origine</th>
                                     <th></th>
                                 </tr>

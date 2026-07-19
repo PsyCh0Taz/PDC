@@ -14,6 +14,10 @@ if (!$isAdmin) {
 }
 
 $pageTitle = 'Administration';
+$breadcrumb = array(
+    array('label' => APP_NAME, 'link' => APP_URL . '/index.php?id=0'),
+    array('label' => 'Administration', 'link' => APP_URL . '/admin.php')
+);
 $tab = isset($_GET['tab']) ? $_GET['tab'] : 'hierarchie';
 $purgeMessage = null;
 

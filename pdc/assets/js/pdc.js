@@ -8,6 +8,8 @@
     // Variables pour stocker l'état des modales
     var PDC_CURRENT_JALONS = [];
     var PDC_CURRENT_GRADIENTS = [];
+    var PDC_PENDING_JALON_ID = null;
+    var PDC_PENDING_GRADIENT_INDEX = null;
 
     // ---- Initialisation ----
     $(document).ready(function() {
@@ -67,6 +69,49 @@
         }
 
         return $(selector).val();
+    }
+
+    function escapeHtml(value) {
+        return $('<div></div>').text(value || '').html();
+    }
+
+    function buildJalonTooltipContent(jalon, refJalon) {
+        var title = jalon && jalon.libelle ? jalon.libelle : 'Jalon';
+        var date = jalon && jalon.date_jalon ? convertToFrench(jalon.date_jalon) : '';
+        var reportText = 'Aucun report';
+        var commentaire = jalon && jalon.commentaire ? jalon.commentaire : '';
+
+        if (refJalon) {
+            reportText = 'Report depuis ' + escapeHtml(refJalon.libelle || 'Jalon précédent') + ' (' + escapeHtml(convertToFrench(refJalon.date_jalon)) + ')';
+        }
+
+        return '' +
+            '<div class="pdc-jalon-tooltip">' +
+                '<div class="pdc-jalon-tooltip-title">' + escapeHtml(title) + ' (' + escapeHtml(date) + ')</div>' +
+                '<div class="pdc-jalon-tooltip-report">' + reportText + '</div>' +
+                '<div class="pdc-jalon-tooltip-comment">' + (commentaire || '<em>Aucun commentaire</em>') + '</div>' +
+            '</div>';
+    }
+
+    function applyFriseTooltips($scope) {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+            return;
+        }
+
+        $scope.find('[data-bs-toggle="tooltip"]').each(function() {
+            var existing = bootstrap.Tooltip.getInstance(this);
+            if (existing) {
+                existing.dispose();
+            }
+
+            new bootstrap.Tooltip(this, {
+                html: true,
+                placement: 'top',
+                trigger: 'hover focus',
+                container: 'body',
+                customClass: 'pdc-jalon-tooltip-popup'
+            });
+        });
     }
 
     // ---- Datepickers jQuery UI ----
@@ -159,6 +204,129 @@
         $('.pdc-frise').each(function() {
             renderFrise($(this));
         });
+    }
+
+    function focusJalonRow(jalonId) {
+        if (!jalonId || !$('#projet-tabs').length) {
+            return;
+        }
+
+        $('#projet-tabs').tabs('option', 'active', 2);
+
+        $('#jalons-list tr').removeClass('pdc-jalon-row-target');
+
+        var $row = $('#jalons-list tr[data-jalon-id="' + jalonId + '"]').first();
+        if (!$row.length) {
+            return;
+        }
+
+        $row.addClass('pdc-jalon-row-target');
+
+        var $field = $row.find('.jalon-libelle').first();
+        if ($field.length) {
+            $field.trigger('focus');
+            if ($field[0] && typeof $field[0].setSelectionRange === 'function') {
+                var fieldValue = $field.val() || '';
+                $field[0].setSelectionRange(fieldValue.length, fieldValue.length);
+            }
+        }
+
+        if ($row[0] && typeof $row[0].scrollIntoView === 'function') {
+            $row[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function focusGradientRow(gradientIndex) {
+        if (gradientIndex === null || typeof gradientIndex === 'undefined' || !$('#projet-tabs').length) {
+            return;
+        }
+
+        $('#projet-tabs').tabs('option', 'active', 1);
+
+        $('#gradients-list tr').removeClass('pdc-gradient-row-target');
+
+        var $row = $('#gradients-list tr[data-gradient-index="' + gradientIndex + '"]').first();
+        if (!$row.length) {
+            return;
+        }
+
+        $row.addClass('pdc-gradient-row-target');
+
+        var $field = $row.find('.gradient-libelle').first();
+        if ($field.length) {
+            $field.trigger('focus');
+            if ($field[0] && typeof $field[0].setSelectionRange === 'function') {
+                var fieldValue = $field.val() || '';
+                $field[0].setSelectionRange(fieldValue.length, fieldValue.length);
+            }
+        }
+
+        if ($row[0] && typeof $row[0].scrollIntoView === 'function') {
+            $row[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function applyPendingProjetEditorFocus() {
+        if (PDC_PENDING_GRADIENT_INDEX !== null) {
+            focusGradientRow(PDC_PENDING_GRADIENT_INDEX);
+            return;
+        }
+
+        focusJalonRow(PDC_PENDING_JALON_ID);
+    }
+
+    function openProjetEditor(projetId, target) {
+        PDC.currentProjetId = projetId;
+        PDC_PENDING_JALON_ID = target && target.jalonId ? target.jalonId : null;
+        PDC_PENDING_GRADIENT_INDEX = target && typeof target.gradientIndex !== 'undefined'
+            ? target.gradientIndex
+            : null;
+
+        $.post(PDC.appUrl + '/api.php', {
+            action: 'get_projet',
+            id: projetId,
+        }, function(data) {
+            if (data.success) {
+                loadProjetInModal(data.projet, data.gradients, data.jalons);
+                $('#modal-edit-projet').modal('show');
+                applyPendingProjetEditorFocus();
+            } else {
+                alert('Erreur : ' + data.error);
+            }
+        }, 'json');
+    }
+
+    function findNearestGradientIndex($frise, event) {
+        var gradients = $frise.data('gradients') || [];
+        if (!gradients.length || !$frise.length || !$frise[0]) {
+            return null;
+        }
+
+        var rect = $frise[0].getBoundingClientRect();
+        if (!rect.width) {
+            return 0;
+        }
+
+        var ratio = (event.clientX - rect.left) / rect.width;
+        ratio = Math.max(0, Math.min(1, ratio));
+
+        var periodeDebut = parseISODate($frise.data('periode-debut'));
+        var periodeFin = parseISODate($frise.data('periode-fin'));
+        var clickedTime = periodeDebut.getTime() + ((periodeFin.getTime() - periodeDebut.getTime()) * ratio);
+
+        var nearestIndex = 0;
+        var nearestDistance = Number.MAX_VALUE;
+
+        gradients.forEach(function(gradient, index) {
+            var gradientTime = parseISODate(gradient.date_gradient).getTime();
+            var distance = Math.abs(gradientTime - clickedTime);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = index;
+            }
+        });
+
+        return nearestIndex;
     }
 
     function renderFrise($frise) {
@@ -260,18 +428,22 @@
             if (isJalonVisible) {
                 $jalon.css('left', jalonOffset + '%');
             }
+            if (jalon.id) {
+                $jalon.attr('data-jalon-id', jalon.id);
+            }
 
             var $triangle = $('<div class="pdc-jalon-triangle pdc-couleur-' + jalon.couleur + '"></div>');
             
             var $libelle = $('<div class="pdc-jalon-libelle"></div>');
             
             var libelleTronque = jalon.libelle.length > 15 ? jalon.libelle.substr(0, 15) + '…' : jalon.libelle;
-            $libelle.text(libelleTronque).attr('title', jalon.libelle);
+            $libelle.text(libelleTronque);
             var $jalonTitle = jalon.libelle + "("  + convertToFrench(jalon.date_jalon) + ')';
+            var refJalon = null;
             
             // Pointillé si décalé
             if (jalon.jalon_reference_id) {
-                var refJalon = jalons.find(function(j) { 
+                refJalon = jalons.find(function(j) { 
                     return parseInt(j.id, 10) === parseInt(jalon.jalon_reference_id, 10); 
                 });
                 if (refJalon) {
@@ -325,12 +497,18 @@
             }
 
             if (isJalonVisible) {
-                $triangle.attr('title', $jalonTitle);
+                $jalon.attr({
+                    'data-bs-toggle': 'tooltip',
+                    'data-bs-html': 'true',
+                    'data-bs-title': buildJalonTooltipContent(jalon, refJalon)
+                });
                 $jalon.append($triangle).append($libelle);
                 $frise.css('min-height', ($nbrPointilles * ( $hauteurDecalage + 5)) + 60 + 'px'); // S'assurer que la frise est assez haute pour les jalons
                 $frise.append($jalon);
             }
         });
+
+        applyFriseTooltips($frise);
     }
 
     function buildGradient(gradients, dateDebut, dateFin, visibleDebut, visibleFin) {
@@ -710,19 +888,7 @@
         $(document).on('click', '.pdc-edit-projet', function(e) {
             e.preventDefault();
             var projetId = $(this).data('projet-id');
-            PDC.currentProjetId = projetId;
-            
-            $.post(PDC.appUrl + '/api.php', {
-                action: 'get_projet',
-                id: projetId,
-            }, function(data) {
-                if (data.success) {
-                    loadProjetInModal(data.projet, data.gradients, data.jalons);
-                    $('#modal-edit-projet').modal('show');
-                } else {
-                    alert('Erreur : ' + data.error);
-                }
-            }, 'json');
+            openProjetEditor(projetId, null);
         });
 
         // Éditer un projet au double-clic sur le titre
@@ -735,6 +901,68 @@
             var $btn = $(this).closest('.pdc-projet-header').find('.pdc-edit-projet').first();
             if ($btn.length) {
                 $btn.trigger('click');
+            }
+        });
+
+        // Éditer un jalon au double-clic dans la frise
+        $(document).on('dblclick', '.pdc-jalon', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) {
+                return;
+            }
+
+            e.preventDefault();
+
+            var jalonId = $(this).attr('data-jalon-id') || null;
+            var projetId = $(this).closest('.pdc-frise').data('projet-id');
+            if (!projetId) {
+                return;
+            }
+
+            openProjetEditor(projetId, { jalonId: jalonId });
+        });
+
+        // Éditer le gradient le plus proche au double-clic sur la frise
+        $(document).on('dblclick', '.pdc-frise-arrow', function(e) {
+            if ($(e.target).closest('.pdc-jalon').length) {
+                return;
+            }
+
+            e.preventDefault();
+
+            var $frise = $(this).closest('.pdc-frise');
+            var projetId = $frise.data('projet-id');
+            if (!projetId) {
+                return;
+            }
+
+            openProjetEditor(projetId, {
+                gradientIndex: findNearestGradientIndex($frise, e)
+            });
+        });
+
+        // Éditer un commentaire au double-clic
+        $(document).on('dblclick', '.pdc-commentaire', function(e) {
+            if ($(e.target).closest('button, a, input, select, textarea').length) {
+                return;
+            }
+
+            e.preventDefault();
+
+            var $projet = $(this).closest('.pdc-projet');
+            if ($projet.length) {
+                var $projetBtn = $projet.find('.pdc-edit-projet').first();
+                if ($projetBtn.length) {
+                    $projetBtn.trigger('click');
+                }
+                return;
+            }
+
+            var $domaine = $(this).closest('.pdc-domaine');
+            if ($domaine.length) {
+                var $domaineBtn = $domaine.find('.pdc-edit-domaine').first();
+                if ($domaineBtn.length) {
+                    $domaineBtn.trigger('click');
+                }
             }
         });
 
@@ -875,8 +1103,8 @@
 
         // Gradients
         $('#gradients-list').empty();
-        gradients.forEach(function(g) {
-            addGradientRow(g);
+        gradients.forEach(function(g, index) {
+            addGradientRow(g, index);
         });
 
         // Jalons
@@ -884,14 +1112,19 @@
         jalons.forEach(function(j) {
             addJalonRow(j);
         });
+
+        applyPendingProjetEditorFocus();
     }
 
-    function addGradientRow(data) {
+    function addGradientRow(data, gradientIndex) {
         var date = data ? convertToFrench(data.date_gradient) : '';
         var couleur = data ? data.couleur : 'vert';
         var libelle = data ? data.libelle : '';
 
         var $tr = $('<tr></tr>');
+        if (typeof gradientIndex !== 'undefined' && gradientIndex !== null) {
+            $tr.attr('data-gradient-index', gradientIndex);
+        }
         $tr.append('<td><input type="text" class="form-control gradient-date" value="' + date + '" required></td>');
         $tr.append('<td><select class="form-control gradient-couleur">' +
             '<option value="vert"' + (couleur === 'vert' ? ' selected' : '') + '>Vert</option>' +
@@ -912,6 +1145,7 @@
         var date = data ? convertToFrench(data.date_jalon) : '';
         var couleur = data ? data.couleur : 'vert';
         var libelle = data ? data.libelle : '';
+        var commentaire = data ? (data.commentaire || '') : '';
         var refId = data ? data.jalon_reference_id : null;
 
         var $tr = $('<tr></tr>');
@@ -925,6 +1159,9 @@
             '<option value="rouge"' + (couleur === 'rouge' ? ' selected' : '') + '>Rouge</option>' +
             '</select></td>');
         $tr.append('<td><input type="text" class="form-control jalon-libelle" value="' + libelle + '"></td>');
+        var $commentaireField = $('<textarea class="form-control jalon-commentaire" rows="2"></textarea>');
+        $commentaireField.val(commentaire);
+        $tr.append($('<td></td>').append($commentaireField));
 
         var $refSelect = $('<select class="form-control jalon-reference"></select>');
         $refSelect.append('<option value="">-- Aucune référence --</option>');
@@ -972,6 +1209,7 @@
             var date = convertToISO($(this).find('.jalon-date').val());
             var couleur = $(this).find('.jalon-couleur').val();
             var libelle = $(this).find('.jalon-libelle').val();
+            var commentaireJalon = $(this).find('.jalon-commentaire').val();
             var refId = $(this).find('.jalon-reference').val();
             var jalonId = $(this).attr('data-jalon-id');
             if (date) {
@@ -980,6 +1218,7 @@
                     date: date,
                     couleur: couleur,
                     libelle: libelle,
+                    commentaire: commentaireJalon,
                     jalon_reference_id: (refId && refId !== '') ? refId : null,
                 };
                 // Envoyer l'ID si le jalon existe en BD (n'est pas nouveau)
