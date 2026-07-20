@@ -64,9 +64,47 @@ class Auth {
             'SELECT role_dn, role FROM pdc_utilisateurs_roles WHERE username = ?',
             array($username)
         );
-        $roles = array();
+        $directRoles = array();
         foreach ($rows as $row) {
-            $roles[$row['role_dn']] = $row['role'];
+            $directRoles[$row['role_dn']] = $row['role'];
+        }
+
+        $roles = array();
+        if (isset($directRoles['*']) && $directRoles['*'] === 'admin') {
+            $roles['*'] = 'admin';
+        }
+
+        $levels = $db->fetchAll('SELECT id, id_parent FROM pdc_hierarchie');
+        $parents = array();
+        foreach ($levels as $level) {
+            $parents[(int)$level['id']] = (int)$level['id_parent'];
+        }
+
+        $resolved = array();
+        $resolving = array();
+        $resolveRole = function($levelId) use (&$resolveRole, &$resolved, &$resolving, $parents, $directRoles) {
+            if (array_key_exists($levelId, $resolved)) return $resolved[$levelId];
+            if (isset($resolving[$levelId])) return '';
+            $resolving[$levelId] = true;
+
+            $scope = 'hierarchie:' . $levelId;
+            if (array_key_exists($scope, $directRoles)) {
+                $role = $directRoles[$scope];
+            } else {
+                $parentId = isset($parents[$levelId]) ? $parents[$levelId] : 0;
+                $role = $parentId > 0 ? $resolveRole($parentId) : '';
+            }
+
+            unset($resolving[$levelId]);
+            $resolved[$levelId] = $role;
+            return $role;
+        };
+
+        foreach ($parents as $levelId => $parentId) {
+            $role = $resolveRole($levelId);
+            if ($role === 'lecteur' || $role === 'modificateur') {
+                $roles['hierarchie:' . $levelId] = $role;
+            }
         }
         return $roles;
     }
@@ -96,7 +134,14 @@ class Auth {
         }
         // Rafraîchit les rôles
         $_SESSION['user']['roles'] = self::loadRoles($_SESSION['user']['username']);
+        $_SESSION['user']['niveau_id'] = self::loadViewLevel($_SESSION['user']['username']);
         return $_SESSION['user'];
+    }
+
+    public static function loadViewLevel($username) {
+        $db = Database::getInstance();
+        $row = $db->fetchOne('SELECT niveau_id FROM pdc_utilisateurs WHERE username = ?', array($username));
+        return $row && !empty($row['niveau_id']) ? (int)$row['niveau_id'] : 0;
     }
 
     /**

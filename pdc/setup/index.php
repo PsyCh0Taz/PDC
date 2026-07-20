@@ -81,7 +81,7 @@ if (empty($_SESSION[$setupSessionKey])) {
         <title>Setup - Connexion</title>
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
-        <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+        <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
     </head>
     <body class="pdc-login-page">
     <div class="pdc-login-shell">
@@ -304,7 +304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <title>Setup - Tests techniques</title>
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
 </head>
 <body>
 <div class="container py-5">
