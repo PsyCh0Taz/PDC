@@ -120,6 +120,37 @@ class LDAP {
 	}
 
 	/**
+	 * Retrouve un utilisateur LDAP par son identifiant exact.
+	 */
+	public static function findUserByUsername($username) {
+		$username = trim((string)$username);
+		if ($username === '') return false;
+
+		$ldap = self::connectAsAccount();
+		$safe = self::escapeFilterValue($username);
+		$filter = '(&(objectClass=person)(|(uid=' . $safe . ')(sAMAccountName=' . $safe . ')))';
+		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'uid', 'sAMAccountName', 'displayName', 'mail'), 0, 2);
+		if (!$search) {
+			@ldap_unbind($ldap);
+			return false;
+		}
+
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
+		if (!is_array($entries) || (int)$entries['count'] !== 1 || empty($entries[0]['dn'])) {
+			return false;
+		}
+
+		$entry = $entries[0];
+		return array(
+			'username' => $username,
+			'dn' => $entry['dn'],
+			'displayname' => !empty($entry['displayname'][0]) ? $entry['displayname'][0] : $username,
+			'email' => !empty($entry['mail'][0]) ? $entry['mail'][0] : '',
+		);
+	}
+
+	/**
 	 * Recherche des utilisateurs LDAP par login, nom ou e-mail.
 	 */
 	public static function searchUsers($query, $limit = 20) {

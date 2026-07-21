@@ -193,4 +193,59 @@ class Auth {
         return LDAP::searchUsers($query, $limit);
     }
 
+    /**
+     * Recherche des utilisateurs dans l'annuaire HTTP externe.
+     */
+    public static function searchExternalUsers($query, $limit = 25) {
+        $query = trim((string)$query);
+        if ($query === '') return array();
+
+        $url = ANNUAIRE_SEARCH_URL . '?query=' . rawurlencode($query);
+        $context = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => 5,
+                'ignore_errors' => true,
+                'header' => "Accept: application/json\r\nConnection: close\r\n",
+            ),
+        ));
+        $json = @file_get_contents($url, false, $context);
+        if ($json === false) {
+            throw new Exception('Le service d\'annuaire externe est indisponible.');
+        }
+
+        $payload = json_decode($json, true);
+        if (!is_array($payload)) {
+            throw new Exception('La réponse du service d\'annuaire est invalide.');
+        }
+
+        $entries = isset($payload['hits']['hits']) && is_array($payload['hits']['hits'])
+            ? $payload['hits']['hits']
+            : $payload;
+        $users = array();
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) continue;
+            $source = isset($entry['_source']) && is_array($entry['_source']) ? $entry['_source'] : $entry;
+            $username = isset($source['uid']) ? trim((string)$source['uid']) : '';
+            if ($username === '' && isset($source['pnia'])) $username = trim((string)$source['pnia']);
+            if ($username === '' && isset($entry['_id'])) $username = trim((string)$entry['_id']);
+            if ($username === '') continue;
+
+            $dn = '';
+            if (!empty($source['dn'])) $dn = trim((string)$source['dn']);
+            elseif (!empty($source['distinguishedname'])) $dn = trim((string)$source['distinguishedname']);
+            elseif (!empty($source['distinguishedName'])) $dn = trim((string)$source['distinguishedName']);
+
+            $users[] = array(
+                'username' => $username,
+                'displayname' => !empty($source['nomcomplet']) ? (string)$source['nomcomplet'] : $username,
+                'dn' => $dn,
+                'email' => !empty($source['email']) && $source['email'] !== '---' ? (string)$source['email'] : '',
+            );
+            if (count($users) >= (int)$limit) break;
+        }
+
+        return $users;
+    }
+
 }

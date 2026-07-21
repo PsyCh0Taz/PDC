@@ -270,7 +270,7 @@ include __DIR__ . '/includes/header.php';
 
                 <div class="pdc-roles-toolbar">
                     <button type="button" class="btn btn-primary" id="btn-open-ldap-user-search">
-                        <i class="fa-solid fa-user-plus"></i> Ajouter un utilisateur LDAP
+                        <i class="fa-solid fa-user-plus"></i> Ajouter un utilisateur
                     </button>
                 </div>
 
@@ -1210,11 +1210,8 @@ function initLdapUserSearch() {
     });
 
     searchBtn.addEventListener('click', searchLdapUsers);
-    queryInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            searchLdapUsers();
-        }
+    queryInput.addEventListener('input', function() {
+        searchLdapUsers();
     });
 }
 
@@ -1223,7 +1220,7 @@ function searchLdapUsers() {
     const results = document.getElementById('ldap-search-results');
     const query = queryInput.value.trim();
 
-    if (query.length < 2) {
+    if (query.length < 1) {
         results.innerHTML = '<div class="alert alert-warning">Saisissez au moins 2 caractères.</div>';
         return;
     }
@@ -1232,7 +1229,7 @@ function searchLdapUsers() {
     formData.append('action', 'search_ldap_users');
     formData.append('query', query);
 
-    results.innerHTML = '<div class="text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Recherche LDAP...</div>';
+    results.innerHTML = '<div class="text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Recherche dans l\'annuaire...</div>';
 
     fetch('<?php echo APP_URL; ?>/api.php', {
         method: 'POST',
@@ -1270,8 +1267,8 @@ function searchLdapUsers() {
         });
     })
     .catch(error => {
-        console.error('Erreur LDAP:', error);
-        results.innerHTML = '<div class="alert alert-danger">Erreur lors de la recherche LDAP.</div>';
+        console.error('Erreur annuaire:', error);
+        results.innerHTML = '<div class="alert alert-danger">Erreur lors de la recherche dans l\'annuaire.</div>';
     });
 }
 

@@ -13,6 +13,9 @@ define('DB_CHARSET',     'utf8mb4');
 // Mode Offline (pour développement/test)
 define('OFFLINE_MODE',     true);
 
+// Annuaire externe utilisé pour rechercher les utilisateurs à autoriser
+define('ANNUAIRE_SEARCH_URL', 'http://127.0.0.1/pdc/annuaire.json');
+
 // LDAP
 define('LDAP_HOST',     '192.168.1.2');
 define('LDAP_PORT',        389);

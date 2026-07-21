@@ -518,11 +518,11 @@ try {
             if (!$isAdmin) throw new Exception('Accès refusé');
 
             $query = isset($_POST['query']) ? trim($_POST['query']) : '';
-            if (strlen($query) < 2) {
+            if (strlen($query) < 1) {
                 throw new Exception('La recherche doit contenir au moins 2 caractères');
             }
 
-            $users = Auth::searchUsers($query, 25);
+            $users = Auth::searchExternalUsers($query, 25);
             echo json_encode(array('success' => true, 'users' => $users));
             break;
 
@@ -530,13 +530,19 @@ try {
             if (!$isAdmin) throw new Exception('Accès refusé');
 
             $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-            $dn = isset($_POST['dn']) ? trim($_POST['dn']) : '';
+            $dn = '';
             $displayname = isset($_POST['displayname']) ? trim($_POST['displayname']) : '';
             $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 
-            if ($username === '' || $dn === '') {
+            if ($username === '') {
                 throw new Exception('Utilisateur LDAP invalide');
             }
+
+            $ldapUser = LDAP::findUserByUsername($username);
+            if ($ldapUser === false || empty($ldapUser['dn'])) {
+                throw new Exception('Utilisateur introuvable dans LDAP');
+            }
+            $dn = $ldapUser['dn'];
 
             if ($displayname === '') {
                 $displayname = $username;
