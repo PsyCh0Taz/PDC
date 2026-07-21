@@ -44,13 +44,30 @@ class Auth {
             return self::loginOffline($username, $password);
         }
 
-        $info = LDAP::authenticateUser($username, $password);
-        if ($info === false) {
+        // En mode online, la base locale constitue la liste blanche des comptes.
+        $db = Database::getInstance();
+        $user = $db->fetchOne(
+            'SELECT username, displayname, dn, email FROM pdc_utilisateurs WHERE username = ?',
+            array($username)
+        );
+        if (!$user || empty($user['dn'])) {
             return false;
         }
 
+        // Le mot de passe reste vérifié par LDAP, avec le DN enregistré en base.
+        if (!LDAP::bindUserDn($user['dn'], $password)) {
+            return false;
+        }
+
+        $info = array(
+            'username'    => $user['username'],
+            'dn'          => $user['dn'],
+            'displayname' => !empty($user['displayname']) ? $user['displayname'] : $user['username'],
+            'mail'        => !empty($user['email']) ? $user['email'] : '',
+        );
+
         // Charger les rôles depuis MySQL
-        $info['roles'] = self::loadRoles($username);
+        $info['roles'] = self::loadRoles($user['username']);
 
         return $info;
     }

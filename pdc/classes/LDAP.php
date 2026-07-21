@@ -103,6 +103,23 @@ class LDAP {
 	}
 
 	/**
+	 * Vérifie les identifiants d'un utilisateur à partir d'un DN déjà connu.
+	 * Le DN doit provenir d'une source de confiance, telle que la base locale.
+	 */
+	public static function bindUserDn($dn, $password) {
+		$dn = trim((string)$dn);
+		if ($dn === '' || $password === '') {
+			return false;
+		}
+
+		$ldap = self::openConnection();
+		$authenticated = @ldap_bind($ldap, $dn, $password);
+		@ldap_unbind($ldap);
+
+		return (bool)$authenticated;
+	}
+
+	/**
 	 * Recherche des utilisateurs LDAP par login, nom ou e-mail.
 	 */
 	public static function searchUsers($query, $limit = 20) {
