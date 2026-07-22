@@ -128,7 +128,7 @@ class LDAP {
 
 		$ldap = self::connectAsAccount();
 		$safe = self::escapeFilterValue($username);
-		$filter = '(&(objectClass=person)(|(uid=' . $safe . ')(sAMAccountName=' . $safe . ')))';
+		$filter = '(&(objectClass=person)(|(uid=' . $safe . ')(cn=' . $safe . ')(sAMAccountName=' . $safe . ')))';
 		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'uid', 'sAMAccountName', 'displayName', 'mail'), 0, 2);
 		if (!$search) {
 			@ldap_unbind($ldap);
@@ -203,6 +203,66 @@ class LDAP {
 		}
 
 		return $users;
+	}
+
+	/**
+	 * Recherche libre dans la sous-arborescence d'un DN et retourne tous les attributs.
+	 */
+	public static function searchFromDn($baseDn, $limit = 100) {
+		$baseDn = trim((string)$baseDn);
+		if ($baseDn === '') {
+			throw new Exception('Le DN de recherche est obligatoire.');
+		}
+		if (!extension_loaded('ldap')) {
+			throw new Exception('Extension LDAP non disponible sur PHP.');
+		}
+
+		$ldap = self::connectAsAccount();
+		$filter = '(objectClass=*)';
+		$search = @ldap_search($ldap, $baseDn, $filter, array(), false, (int)$limit);
+		if (!$search) {
+			$ldapError = @ldap_error($ldap);
+			@ldap_unbind($ldap);
+			throw new Exception('Recherche LDAP echouee' . ($ldapError ? ' (' . $ldapError . ')' : '') . '.');
+		}
+
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
+		if (!is_array($entries)) {
+			throw new Exception('Impossible de lire les resultats LDAP.');
+		}
+
+		$count = isset($entries['count']) ? (int)$entries['count'] : 0;
+		$rows = array();
+		for ($i = 0; $i < $count; $i++) {
+			if (!isset($entries[$i])) {
+				continue;
+			}
+
+			$row = array('dn' => isset($entries[$i]['dn']) ? (string)$entries[$i]['dn'] : '');
+			foreach ($entries[$i] as $attribute => $values) {
+				if ($attribute === 'count' || $attribute === 'dn' || is_numeric($attribute) || !is_array($values)) {
+					continue;
+				}
+				$attributeValues = array();
+				$valueCount = isset($values['count']) ? (int)$values['count'] : 0;
+				for ($valueIndex = 0; $valueIndex < $valueCount; $valueIndex++) {
+					$attributeValues[] = (string)$values[$valueIndex];
+				}
+				$row[$attribute] = $attributeValues;
+			}
+			$rows[] = $row;
+		}
+
+		return array(
+			'success' => true,
+			'message' => $count . ' entree(s) trouvee(s) a partir du DN indique.',
+			'base_dn' => $baseDn,
+			'filter' => $filter,
+			'count' => $count,
+			'limit' => (int)$limit,
+			'results' => $rows,
+		);
 	}
 
 	/**
