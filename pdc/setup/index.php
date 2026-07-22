@@ -60,6 +60,7 @@ $configValues = array(
     'db_pass' => DB_PASS,
     'db_charset' => DB_CHARSET,
     'offline_mode' => OFFLINE_MODE ? '1' : '0',
+    'annuaire_search_url' => ANNUAIRE_SEARCH_URL,
     'ldap_host' => LDAP_HOST,
     'ldap_port' => (string)LDAP_PORT,
     'ldap_base_dn' => LDAP_BASE_DN,
@@ -158,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             'db_pass' => isset($_POST['db_pass']) ? (string)$_POST['db_pass'] : '',
             'db_charset' => isset($_POST['db_charset']) ? trim((string)$_POST['db_charset']) : '',
             'offline_mode' => isset($_POST['offline_mode']) ? '1' : '0',
+            'annuaire_search_url' => isset($_POST['annuaire_search_url']) ? trim((string)$_POST['annuaire_search_url']) : '',
             'ldap_host' => isset($_POST['ldap_host']) ? trim((string)$_POST['ldap_host']) : '',
             'ldap_port' => isset($_POST['ldap_port']) ? trim((string)$_POST['ldap_port']) : '',
             'ldap_base_dn' => isset($_POST['ldap_base_dn']) ? trim((string)$_POST['ldap_base_dn']) : '',
@@ -178,6 +180,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             if ($configValues['ldap_host'] === '' || $configValues['ldap_base_dn'] === '') {
                 throw new Exception('LDAP_HOST et LDAP_BASE_DN sont obligatoires.');
+            }
+
+            if ($configValues['annuaire_search_url'] === '' || filter_var($configValues['annuaire_search_url'], FILTER_VALIDATE_URL) === false) {
+                throw new Exception('ANNUAIRE_SEARCH_URL doit etre une URL valide.');
+            }
+            $annuaireScheme = strtolower((string)parse_url($configValues['annuaire_search_url'], PHP_URL_SCHEME));
+            if ($annuaireScheme !== 'http' && $annuaireScheme !== 'https') {
+                throw new Exception('ANNUAIRE_SEARCH_URL doit utiliser le protocole HTTP ou HTTPS.');
             }
 
             if (!ctype_digit($configValues['ldap_port'])) {
@@ -208,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $updated = setupReplaceDefineString($updated, 'DB_PASS', $configValues['db_pass']);
             $updated = setupReplaceDefineString($updated, 'DB_CHARSET', $configValues['db_charset']);
             $updated = setupReplaceDefineBool($updated, 'OFFLINE_MODE', $configValues['offline_mode'] === '1');
+            $updated = setupReplaceDefineString($updated, 'ANNUAIRE_SEARCH_URL', $configValues['annuaire_search_url']);
             $updated = setupReplaceDefineString($updated, 'LDAP_HOST', $configValues['ldap_host']);
             $updated = setupReplaceDefineInt($updated, 'LDAP_PORT', $ldapPort);
             $updated = setupReplaceDefineString($updated, 'LDAP_BASE_DN', $configValues['ldap_base_dn']);
@@ -458,6 +469,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 <div class="col-12 col-md-6">
                     <label class="form-label" for="db_pass">DB_PASS</label>
                     <input type="text" class="form-control" id="db_pass" name="db_pass" value="<?php echo htmlspecialchars($configValues['db_pass'], ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label" for="annuaire_search_url">ANNUAIRE_SEARCH_URL</label>
+                    <input type="url" class="form-control" id="annuaire_search_url" name="annuaire_search_url" value="<?php echo htmlspecialchars($configValues['annuaire_search_url'], ENT_QUOTES, 'UTF-8'); ?>" placeholder="https://example.test/annuaire.json" required>
+                    <div class="form-text">URL HTTP(S) du service d'annuaire externe utilise pour rechercher les utilisateurs.</div>
                 </div>
 
                 <div class="col-12 col-md-4">
