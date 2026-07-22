@@ -7,6 +7,30 @@ class Hierarchie {
 
     private static $domaineCommentColumn = null;
 
+    public static function getViewTree($niveauId, $onlyActive = true) {
+        $niveauId = (int)$niveauId;
+        return $niveauId > 0 ? self::getLevel($niveauId, $onlyActive) : self::getAll($onlyActive);
+    }
+
+    public static function isInView($hierarchieId, $niveauId) {
+        $hierarchieId = (int)$hierarchieId;
+        $niveauId = (int)$niveauId;
+        if ($niveauId <= 0) return true;
+        if ($hierarchieId <= 0) return false;
+
+        $db = Database::getInstance();
+        $visited = array();
+        $currentId = $hierarchieId;
+        while ($currentId > 0 && !isset($visited[$currentId])) {
+            if ($currentId === $niveauId) return true;
+            $visited[$currentId] = true;
+            $row = $db->fetchOne('SELECT id_parent FROM pdc_hierarchie WHERE id = ?', array($currentId));
+            if (!$row) return false;
+            $currentId = (int)$row['id_parent'];
+        }
+        return false;
+    }
+
     public static function getAll($onlyActive = true) {
         $tArray = self::getSubLevel(0, $onlyActive);
 
@@ -317,6 +341,7 @@ class Hierarchie {
 
             // Nettoyage des droits associés à ce scope hiérarchique.
             $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE role_dn = ?', array('hierarchie:' . $levelId));
+            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = NULL WHERE niveau_id = ?', array($levelId));
 
             return $db->execute('DELETE FROM pdc_hierarchie WHERE id = ?', array($levelId));
         }
@@ -331,6 +356,7 @@ class Hierarchie {
 
         foreach ($subtreeIds as $nodeId) {
             $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE role_dn = ?', array('hierarchie:' . (int)$nodeId));
+            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = NULL WHERE niveau_id = ?', array((int)$nodeId));
         }
 
         $deleted = 0;

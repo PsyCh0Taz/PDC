@@ -10,13 +10,19 @@ foreach ($currentUser['roles'] as $dn => $role) {
 }
 $roleRank = array('lecteur' => 1, 'modificateur' => 2);
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
+$viewHierarchy = Hierarchie::getViewTree($viewLevelId, false);
 
-$tmpHierarchie=($id ? Hierarchie::getLevel($id) : Hierarchie::getAll());
-$tmpRevHierarchie=($id ? Hierarchie::getUpperLevel(Hierarchie::getAll(), $id) : null);
+if ($id > 0 && !Hierarchie::isInView($id, $viewLevelId)) {
+    $id = 0;
+}
+
+$tmpHierarchie=($id ? Hierarchie::getLevel($id) : $viewHierarchy);
+$tmpRevHierarchie=($id ? Hierarchie::getUpperLevel($viewHierarchy, $id) : null);
 
 if ($id && empty($tmpHierarchie)) {
     $id = 0;
-    $tmpHierarchie = Hierarchie::getAll();
+    $tmpHierarchie = $viewHierarchy;
     $tmpRevHierarchie = null;
 }
 
@@ -65,7 +71,7 @@ function flattenHierarchyForSelect(array $nodes, $depth = 0, array $allowedIds =
     return $result;
 }
 
-$allHierarchy = Hierarchie::getAll(false);
+$allHierarchy = $viewHierarchy;
 $editableHierarchyOptions = flattenHierarchyForSelect($allHierarchy, 0, $editableHierarchyIds);
 $domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
 $showNoDomainReadOnlyAlert = ($id > 0) && $canReadCurrentLevel && !$canModifyCurrentLevel && empty($domainesList);
@@ -98,6 +104,7 @@ function buildSunburstTreeData(array $nodes, array $userRoles, array $roleRank, 
             'state' => $state,
             'url' => '?id=' . $nodeId . '&date_debut=' . urlencode($dateDebut) . '&date_fin=' . urlencode($dateFin),
             'children' => $children,
+            'value' => empty($children) ? 1 : null,
         );
     }
 
@@ -252,8 +259,27 @@ include __DIR__ . '/includes/header.php';
         </div>
         <?php endif; ?>
             <?php if ((int)$id === 0): ?>
-            <section class="pdc-sunburst-overview">
-                <div id="pdc-sunburst" class="pdc-sunburst-canvas" aria-label="Drill-down Sunburst"></div>
+            <section class="pdc-hierarchy-overview">
+                <ul class="nav nav-tabs pdc-hierarchy-tabs" id="pdc-hierarchy-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="pdc-sunburst-tab" data-bs-toggle="tab" data-bs-target="#pdc-sunburst-pane" type="button" role="tab" aria-controls="pdc-sunburst-pane" aria-selected="true">
+                            Sunburst
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pdc-force-tree-tab" data-bs-toggle="tab" data-bs-target="#pdc-force-tree-pane" type="button" role="tab" aria-controls="pdc-force-tree-pane" aria-selected="false">
+                            Zoomable Force Directed Tree
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content pdc-hierarchy-tab-content" id="pdc-hierarchy-tab-content">
+                    <div class="tab-pane fade show active" id="pdc-sunburst-pane" role="tabpanel" aria-labelledby="pdc-sunburst-tab" tabindex="0">
+                        <div id="pdc-sunburst" class="pdc-sunburst-canvas" aria-label="Sunburst interactif de la hiérarchie"></div>
+                    </div>
+                    <div class="tab-pane fade" id="pdc-force-tree-pane" role="tabpanel" aria-labelledby="pdc-force-tree-tab" tabindex="0">
+                        <div id="pdc-force-tree" class="pdc-force-tree-canvas" aria-label="Arbre de forces zoomable de la hiérarchie"></div>
+                    </div>
+                </div>
             </section>
             <?php endif; ?>
 
@@ -690,4 +716,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+<?php if ((int)$id === 0): ?>
+<script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+<script src="https://cdn.amcharts.com/lib/5/hierarchy.js"></script>
+<script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+<?php endif; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

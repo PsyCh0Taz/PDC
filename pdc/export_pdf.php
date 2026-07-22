@@ -14,6 +14,12 @@ if ($hierarchieId <= 0) {
     die('Niveau de hierarchie invalide.');
 }
 
+$viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
+if (!Hierarchie::isInView($hierarchieId, $viewLevelId)) {
+    http_response_code(403);
+    die('Acces refuse. Ce niveau est hors de votre vue.');
+}
+
 $roleRank = array(
     'lecteur' => 1,
     'modificateur' => 2,
@@ -111,7 +117,7 @@ header('Content-Type: text/html; charset=utf-8');
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/jquery-ui.min.css">
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
     <style>
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; color: #222; margin: 20px; line-height: 1.35; }
@@ -446,6 +452,6 @@ header('Content-Type: text/html; charset=utf-8');
     <script src="<?php echo APP_URL; ?>/assets/js/jquery-ui.min.js"></script>
     <script src="<?php echo APP_URL; ?>/assets/js/bootstrap.bundle.min.js"></script>
     <script src="<?php echo APP_URL; ?>/assets/js/fontawesome.min.js"></script>
-    <script src="<?php echo APP_URL; ?>/assets/js/pdc.js"></script>
+    <script src="<?php echo APP_URL; ?>/assets/pdc.js"></script>
 </body>
 </html>

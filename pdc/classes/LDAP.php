@@ -103,6 +103,54 @@ class LDAP {
 	}
 
 	/**
+	 * Vérifie les identifiants d'un utilisateur à partir d'un DN déjà connu.
+	 * Le DN doit provenir d'une source de confiance, telle que la base locale.
+	 */
+	public static function bindUserDn($dn, $password) {
+		$dn = trim((string)$dn);
+		if ($dn === '' || $password === '') {
+			return false;
+		}
+
+		$ldap = self::openConnection();
+		$authenticated = @ldap_bind($ldap, $dn, $password);
+		@ldap_unbind($ldap);
+
+		return (bool)$authenticated;
+	}
+
+	/**
+	 * Retrouve un utilisateur LDAP par son identifiant exact.
+	 */
+	public static function findUserByUsername($username) {
+		$username = trim((string)$username);
+		if ($username === '') return false;
+
+		$ldap = self::connectAsAccount();
+		$safe = self::escapeFilterValue($username);
+		$filter = '(&(objectClass=person)(|(uid=' . $safe . ')(cn=' . $safe . ')(sAMAccountName=' . $safe . ')))';
+		$search = @ldap_search($ldap, LDAP_BASE_DN, $filter, array('dn', 'uid', 'sAMAccountName', 'displayName', 'mail'), 0, 2);
+		if (!$search) {
+			@ldap_unbind($ldap);
+			return false;
+		}
+
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
+		if (!is_array($entries) || (int)$entries['count'] !== 1 || empty($entries[0]['dn'])) {
+			return false;
+		}
+
+		$entry = $entries[0];
+		return array(
+			'username' => $username,
+			'dn' => $entry['dn'],
+			'displayname' => !empty($entry['displayname'][0]) ? $entry['displayname'][0] : $username,
+			'email' => !empty($entry['mail'][0]) ? $entry['mail'][0] : '',
+		);
+	}
+
+	/**
 	 * Recherche des utilisateurs LDAP par login, nom ou e-mail.
 	 */
 	public static function searchUsers($query, $limit = 20) {
@@ -155,6 +203,66 @@ class LDAP {
 		}
 
 		return $users;
+	}
+
+	/**
+	 * Recherche libre dans la sous-arborescence d'un DN et retourne tous les attributs.
+	 */
+	public static function searchFromDn($baseDn, $limit = 100) {
+		$baseDn = trim((string)$baseDn);
+		if ($baseDn === '') {
+			throw new Exception('Le DN de recherche est obligatoire.');
+		}
+		if (!extension_loaded('ldap')) {
+			throw new Exception('Extension LDAP non disponible sur PHP.');
+		}
+
+		$ldap = self::connectAsAccount();
+		$filter = '(objectClass=*)';
+		$search = @ldap_search($ldap, $baseDn, $filter, array(), false, (int)$limit);
+		if (!$search) {
+			$ldapError = @ldap_error($ldap);
+			@ldap_unbind($ldap);
+			throw new Exception('Recherche LDAP echouee' . ($ldapError ? ' (' . $ldapError . ')' : '') . '.');
+		}
+
+		$entries = @ldap_get_entries($ldap, $search);
+		@ldap_unbind($ldap);
+		if (!is_array($entries)) {
+			throw new Exception('Impossible de lire les resultats LDAP.');
+		}
+
+		$count = isset($entries['count']) ? (int)$entries['count'] : 0;
+		$rows = array();
+		for ($i = 0; $i < $count; $i++) {
+			if (!isset($entries[$i])) {
+				continue;
+			}
+
+			$row = array('dn' => isset($entries[$i]['dn']) ? (string)$entries[$i]['dn'] : '');
+			foreach ($entries[$i] as $attribute => $values) {
+				if ($attribute === 'count' || $attribute === 'dn' || is_numeric($attribute) || !is_array($values)) {
+					continue;
+				}
+				$attributeValues = array();
+				$valueCount = isset($values['count']) ? (int)$values['count'] : 0;
+				for ($valueIndex = 0; $valueIndex < $valueCount; $valueIndex++) {
+					$attributeValues[] = (string)$values[$valueIndex];
+				}
+				$row[$attribute] = $attributeValues;
+			}
+			$rows[] = $row;
+		}
+
+		return array(
+			'success' => true,
+			'message' => $count . ' entree(s) trouvee(s) a partir du DN indique.',
+			'base_dn' => $baseDn,
+			'filter' => $filter,
+			'count' => $count,
+			'limit' => (int)$limit,
+			'results' => $rows,
+		);
 	}
 
 	/**

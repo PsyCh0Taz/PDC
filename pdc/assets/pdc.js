@@ -17,6 +17,7 @@
     $(document).ready(function() {
         initSidebarToggle();
         initHierarchySunburst();
+        initHierarchyForceTree();
         initTabs();
         initDatepickers();
         initCommentEditors();
@@ -74,6 +75,91 @@
     }
 
     function initHierarchySunburst() {
+        var host = document.getElementById('pdc-sunburst');
+
+        if (!host || typeof PDC === 'undefined' || !Array.isArray(PDC.hierarchyTree)) {
+            return;
+        }
+
+        if (typeof am5 === 'undefined' || typeof am5hierarchy === 'undefined') {
+            host.innerHTML = '<div class="alert alert-warning">Le graphique amCharts n\'a pas pu être chargé.</div>';
+            return;
+        }
+
+        var data = {
+            name: 'Plan de charge',
+            state: 'readonly',
+            children: PDC.hierarchyTree
+        };
+        var root = am5.Root.new(host);
+
+        if (typeof am5themes_Animated !== 'undefined') {
+            root.setThemes([am5themes_Animated.new(root)]);
+        }
+
+        var series = root.container.children.push(am5hierarchy.Sunburst.new(root, {
+            singleBranchOnly: true,
+                downDepth: 2,
+                initialDepth: 1,
+            topDepth: 1,
+            valueField: 'value',
+            categoryField: 'name',
+            childDataField: 'children'
+        }));
+
+        series.slices.template.setAll({
+            stroke: am5.color(0xffffff),
+            strokeWidth: 1,
+            tooltipText: '{category}'
+        });
+        series.slices.template.adapters.add('fill', function(fill, target) {
+            var context = target.dataItem && target.dataItem.dataContext;
+            if (!context || context.state === 'inaccessible') {
+                return am5.color(0xd1d5db);
+            }
+            if (context.state === 'modifiable') {
+                return am5.color(0x86efac);
+            }
+            return am5.color(0xfdba74);
+        });
+        series.labels.template.setAll({
+            fill: am5.color(0x334155),
+            fontSize: 11,
+            fontWeight: '600',
+            oversizedBehavior: 'truncate',
+            minScale: 0.7,
+            interactive: true
+        });
+        series.labels.template.setup = function(label) {
+            label.set('background', am5.Rectangle.new(root, {
+                fill: am5.color(0xffffff),
+                fillOpacity: 0
+            }));
+        };
+        series.labels.template.adapters.add('cursorOverStyle', function(cursor, target) {
+            var context = target.dataItem && target.dataItem.dataContext;
+            return context && context.url && context.state !== 'inaccessible' ? 'pointer' : 'default';
+        });
+        series.labels.template.adapters.add('textDecoration', function(decoration, target) {
+            var context = target.dataItem && target.dataItem.dataContext;
+            return context && context.url && context.state !== 'inaccessible' ? 'underline' : 'none';
+        });
+        series.labels.template.events.on('click', function(event) {
+            var context = event.target.dataItem && event.target.dataItem.dataContext;
+            if (context && context.url && context.state !== 'inaccessible') {
+                if (event.originalEvent && typeof event.originalEvent.stopPropagation === 'function') {
+                    event.originalEvent.stopPropagation();
+                }
+                window.location.href = context.url;
+            }
+        });
+
+        series.data.setAll([data]);
+        series.set('selectedDataItem', series.dataItems[0]);
+        series.appear(1000, 100);
+    }
+
+    function initLegacyHierarchySunburst() {
         var $host = $('#pdc-sunburst');
         if (!$host.length || typeof PDC === 'undefined' || !Array.isArray(PDC.hierarchyTree)) {
             return;
@@ -320,6 +406,178 @@
         $(window).on('resize.pdcSunburst', function() {
             render();
         });
+    }
+
+    function initHierarchyForceTree() {
+        var host = document.getElementById('pdc-force-tree');
+        var tab = document.getElementById('pdc-force-tree-tab');
+        var chartRoot = null;
+
+        if (!host || !tab || typeof PDC === 'undefined' || !Array.isArray(PDC.hierarchyTree)) {
+            return;
+        }
+
+        function renderForceTree() {
+            if (chartRoot) {
+                chartRoot.resize();
+                return;
+            }
+
+            if (typeof am5 === 'undefined' || typeof am5hierarchy === 'undefined') {
+                host.innerHTML = '<div class="alert alert-warning">Le graphique amCharts n\'a pas pu être chargé.</div>';
+                return;
+            }
+
+            var data = {
+                name: 'Plan de charge',
+                state: 'readonly',
+                children: PDC.hierarchyTree
+            };
+
+            chartRoot = am5.Root.new(host);
+            if (typeof am5themes_Animated !== 'undefined') {
+                chartRoot.setThemes([am5themes_Animated.new(chartRoot)]);
+            }
+
+            var zoomableContainer = chartRoot.container.children.push(am5.ZoomableContainer.new(chartRoot, {
+                width: am5.p100,
+                height: am5.p100,
+                wheelable: true,
+                pinchZoom: true
+            }));
+
+            var series = zoomableContainer.contents.children.push(am5hierarchy.ForceDirected.new(chartRoot, {
+                maskContent: false,
+                singleBranchOnly: false,
+                downDepth: 1,
+                initialDepth: 0,
+                topDepth: 1,
+                valueField: 'value',
+                categoryField: 'name',
+                childDataField: 'children',
+                idField: 'id',
+                linkWithStrength: 0.8,
+                manyBodyStrength: -18,
+                centerStrength: 0.7
+            }));
+
+            series.nodes.template.setAll({
+                draggable: true,
+                tooltipText: '{category}'
+            });
+            series.circles.template.adapters.add('radius', function(radius, target) {
+                var depth = target.dataItem ? Number(target.dataItem.get('depth')) || 0 : 0;
+                var visibleDepth = Math.max(0, depth - 1);
+
+                return Math.max(18, 44 * Math.pow(0.75, visibleDepth));
+            });
+            series.circles.template.adapters.add('fill', function(fill, target) {
+                var context = target.dataItem && target.dataItem.dataContext;
+                if (!context || context.state === 'inaccessible') {
+                    return am5.color(0xd1d5db);
+                }
+                if (context.state === 'modifiable') {
+                    return am5.color(0x86efac);
+                }
+                return am5.color(0xfdba74);
+            });
+            series.labels.template.setAll({
+                fontSize: 12,
+                oversizedBehavior: 'truncate',
+                maxWidth: 130,
+                fill: am5.color(document.documentElement.getAttribute('data-theme') === 'dark' ? 0xf1f5f9 : 0x111827),
+                paddingTop: 2,
+                paddingRight: 4,
+                paddingBottom: 2,
+                paddingLeft: 4,
+                interactive: true
+            });
+            series.labels.template.setup = function(label) {
+                label.set('background', am5.Rectangle.new(chartRoot, {
+                    fill: am5.color(document.documentElement.getAttribute('data-theme') === 'dark' ? 0x29374c : 0xffffff),
+                    fillOpacity: 0.82,
+                    cornerRadiusTL: 3,
+                    cornerRadiusTR: 3,
+                    cornerRadiusBR: 3,
+                    cornerRadiusBL: 3
+                }));
+            };
+
+            function updateTreeTheme() {
+                var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+                var textColor = am5.color(dark ? 0xf1f5f9 : 0x111827);
+                var backgroundColor = am5.color(dark ? 0x29374c : 0xffffff);
+
+                series.labels.template.set('fill', textColor);
+                series.labels.each(function(label) {
+                    label.set('fill', textColor);
+                    var background = label.get('background');
+                    if (background) {
+                        background.set('fill', backgroundColor);
+                    }
+                });
+            }
+
+            window.addEventListener('pdc:themechange', updateTreeTheme);
+            series.labels.template.adapters.add('cursorOverStyle', function(cursor, target) {
+                var context = target.dataItem && target.dataItem.dataContext;
+                return context && context.url && context.state !== 'inaccessible' ? 'pointer' : 'default';
+            });
+            series.labels.template.adapters.add('textDecoration', function(decoration, target) {
+                var context = target.dataItem && target.dataItem.dataContext;
+                return context && context.url && context.state !== 'inaccessible' ? 'underline' : 'none';
+            });
+            series.labels.template.events.on('click', function(event) {
+                var context = event.target.dataItem && event.target.dataItem.dataContext;
+                if (context && context.url && context.state !== 'inaccessible') {
+                    if (event.originalEvent && typeof event.originalEvent.stopPropagation === 'function') {
+                        event.originalEvent.stopPropagation();
+                    }
+                    window.location.href = context.url;
+                }
+            });
+
+            function updateTreeLabelSize(scale) {
+                var zoom = Math.max(0.1, Number(scale) || 1);
+                var fontSize = Math.min(48, Math.max(6, 12 / zoom));
+                var maxWidth = Math.min(520, Math.max(65, 130 / zoom));
+
+                series.labels.template.setAll({
+                    fontSize: fontSize,
+                    maxWidth: maxWidth,
+                    paddingTop: 2 / zoom,
+                    paddingRight: 4 / zoom,
+                    paddingBottom: 2 / zoom,
+                    paddingLeft: 4 / zoom
+                });
+                series.labels.each(function(label) {
+                    label.setAll({
+                        fontSize: fontSize,
+                        maxWidth: maxWidth,
+                        paddingTop: 2 / zoom,
+                        paddingRight: 4 / zoom,
+                        paddingBottom: 2 / zoom,
+                        paddingLeft: 4 / zoom
+                    });
+                });
+            }
+
+            zoomableContainer.contents.on('scale', updateTreeLabelSize);
+
+            zoomableContainer.children.push(am5.ZoomTools.new(chartRoot, {
+                target: zoomableContainer
+            }));
+
+            series.data.setAll([data]);
+            series.set('selectedDataItem', series.dataItems[0]);
+            updateTreeLabelSize(zoomableContainer.contents.get('scale'));
+            series.appear(1000, 100);
+        }
+
+        tab.addEventListener('shown.bs.tab', renderForceTree);
+        if (tab.classList.contains('active')) {
+            renderForceTree();
+        }
     }
 
     function initCommentEditors() {

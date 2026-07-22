@@ -266,11 +266,11 @@ include __DIR__ . '/includes/header.php';
         <div role="tabpanel" class="tab-pane active">
             <div class="pdc-admin-section">
                 <h2>Gestion des droits utilisateurs</h2>
-                <p class="text-muted">Sélectionnez un utilisateur à gauche puis définissez son rôle pour chaque niveau hiérarchique.</p>
+                <p class="text-muted">Définissez un droit sur un niveau : il sera hérité par ses sous-niveaux. Utilisez une exception locale uniquement lorsque nécessaire.</p>
 
                 <div class="pdc-roles-toolbar">
                     <button type="button" class="btn btn-primary" id="btn-open-ldap-user-search">
-                        <i class="fa-solid fa-user-plus"></i> Ajouter un utilisateur LDAP
+                        <i class="fa-solid fa-user-plus"></i> Ajouter un utilisateur
                     </button>
                 </div>
 
@@ -290,18 +290,31 @@ include __DIR__ . '/includes/header.php';
 
                 <div class="pdc-roles-layout" id="users-container" style="display: none;">
                     <aside class="pdc-roles-users">
-                        <h4>Utilisateurs</h4>
+                        <h4>Utilisateurs <button type="button" class="btn btn-sm btn-link pdc-users-select-all" id="btn-select-all-users">Tout sélectionner</button></h4>
                         <div id="users-list" class="list-group"></div>
                     </aside>
                     <section class="pdc-roles-rights">
                         <h4 id="selected-user-title">Aucun utilisateur sélectionné</h4>
                         <div id="selected-user-global-admin" class="pdc-global-admin-toggle"></div>
+                        <div class="pdc-bulk-rights-toolbar">
+                            <div class="pdc-bulk-rights-summary" id="bulk-rights-summary">Sélectionnez des utilisateurs et des niveaux.</div>
+                            <label class="pdc-bulk-option"><input type="checkbox" id="bulk-include-descendants"> Écraser aussi les exceptions des sous-niveaux</label>
+                            <select class="form-select" id="bulk-role-select" aria-label="Droit à appliquer">
+                                <option value="">Hérité du parent</option>
+                                <option value="aucun">Aucun droit (exception)</option>
+                                <option value="lecteur">Lecteur</option>
+                                <option value="modificateur">Modificateur</option>
+                            </select>
+                            <button type="button" class="btn btn-primary" id="btn-apply-bulk-role" disabled>
+                                <i class="fa-solid fa-layer-group"></i> Appliquer
+                            </button>
+                        </div>
                         <div class="table-responsive pdc-roles-list">
                             <table class="table table-striped table-hover" id="roles-matrix-table">
                                 <thead>
                                     <tr>
-                                        <th>Niveau hiérarchique</th>
-                                        <th style="width: 360px;">Rôle</th>
+                                        <th><input type="checkbox" id="bulk-select-all-levels" aria-label="Sélectionner tous les niveaux"> Niveau hiérarchique</th>
+                                        <th style="width: 500px;">Rôle</th>
                                     </tr>
                                 </thead>
                                 <tbody id="roles-matrix-body"></tbody>
@@ -449,12 +462,15 @@ var PDC_USERS_STATE = {
     roles: {},
     hierarchie: [],
     selectedUsername: null,
+    selectedUsernames: {},
+    selectedLevelIds: {},
 };
 
 document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('users-list')) {
         loadUsers();
         initLdapUserSearch();
+        initBulkRights();
     }
 
     initHierarchyLevelManagement();
@@ -723,11 +739,12 @@ function renderUsersList() {
             ? '<button type="button" class="btn btn-xs btn-link pdc-user-delete" data-username="' + htmlEscape(user.username) + '" title="Supprimer l\'utilisateur"><i class="fa-solid fa-trash-can"></i></button>'
             : '';
         button.innerHTML = '<div class="pdc-user-item-row">' +
+            '<input type="checkbox" class="pdc-bulk-user-checkbox" data-username="' + htmlEscape(user.username) + '" aria-label="Sélectionner ' + htmlEscape(user.displayname || user.username) + '"' + (PDC_USERS_STATE.selectedUsernames[user.username] ? ' checked' : '') + '>' +
             '<div class="pdc-user-item-main"><strong>' + htmlEscape(user.displayname || user.username) + '</strong><br><small>' + htmlEscape(user.username) + '</small></div>' +
             deleteButtonHtml +
         '</div>';
         button.addEventListener('click', function(e) {
-            if (e.target.closest('.pdc-user-delete')) {
+            if (e.target.closest('.pdc-user-delete') || e.target.closest('.pdc-bulk-user-checkbox')) {
                 return;
             }
             PDC_USERS_STATE.selectedUsername = this.dataset.username;
@@ -735,6 +752,17 @@ function renderUsersList() {
             renderRolesMatrix();
         });
         list.appendChild(button);
+    });
+
+    document.querySelectorAll('.pdc-bulk-user-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                PDC_USERS_STATE.selectedUsernames[this.dataset.username] = true;
+            } else {
+                delete PDC_USERS_STATE.selectedUsernames[this.dataset.username];
+            }
+            updateBulkRightsSummary();
+        });
     });
 
     document.querySelectorAll('.pdc-user-delete').forEach(function(btn) {
@@ -755,11 +783,152 @@ function flattenHierarchy(nodes, depth, out) {
             id: node.id,
             nom: node.nom,
             actif: parseInt(node.actif, 10) === 1,
-            depth: depth
+            depth: depth,
+            parentId: parseInt(node.id_parent, 10) || 0
         });
         if (node.subItems && node.subItems.length) {
             flattenHierarchy(node.subItems, depth + 1, out);
         }
+    });
+}
+
+function initBulkRights() {
+    var selectAllUsers = document.getElementById('btn-select-all-users');
+    var selectAllLevels = document.getElementById('bulk-select-all-levels');
+    var applyButton = document.getElementById('btn-apply-bulk-role');
+    var includeDescendants = document.getElementById('bulk-include-descendants');
+
+    if (selectAllUsers) {
+        selectAllUsers.addEventListener('click', function() {
+            var shouldSelect = Object.keys(PDC_USERS_STATE.selectedUsernames).length < PDC_USERS_STATE.users.length;
+            PDC_USERS_STATE.selectedUsernames = {};
+            if (shouldSelect) {
+                PDC_USERS_STATE.users.forEach(function(user) {
+                    PDC_USERS_STATE.selectedUsernames[user.username] = true;
+                });
+            }
+            renderUsersList();
+        });
+    }
+
+    if (selectAllLevels) {
+        selectAllLevels.addEventListener('change', function() {
+            PDC_USERS_STATE.selectedLevelIds = {};
+            if (this.checked) {
+                var levels = [];
+                flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, levels);
+                levels.forEach(function(level) {
+                    PDC_USERS_STATE.selectedLevelIds[level.id] = true;
+                });
+            }
+            renderRolesMatrix();
+        });
+    }
+
+    if (applyButton) {
+        applyButton.addEventListener('click', applyBulkRights);
+    }
+
+    if (includeDescendants) {
+        includeDescendants.addEventListener('change', updateBulkRightsSummary);
+    }
+}
+
+function getBulkLevelIds() {
+    var selected = PDC_USERS_STATE.selectedLevelIds;
+    var includeDescendants = document.getElementById('bulk-include-descendants');
+    var result = {};
+
+    function visit(nodes, inheritedSelection) {
+        nodes.forEach(function(node) {
+            var selectedHere = !!selected[node.id];
+            if (selectedHere || inheritedSelection) {
+                result[node.id] = true;
+            }
+            if (node.subItems && node.subItems.length) {
+                visit(node.subItems, (includeDescendants && includeDescendants.checked) ? (inheritedSelection || selectedHere) : false);
+            }
+        });
+    }
+
+    visit(PDC_USERS_STATE.hierarchie, false);
+    return Object.keys(result);
+}
+
+function updateBulkRightsSummary() {
+    var summary = document.getElementById('bulk-rights-summary');
+    var applyButton = document.getElementById('btn-apply-bulk-role');
+    if (!summary || !applyButton) {
+        return;
+    }
+
+    var userCount = Object.keys(PDC_USERS_STATE.selectedUsernames).length;
+    var levelCount = getBulkLevelIds().length;
+    var changeCount = userCount * levelCount;
+    var allLevels = [];
+    flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, allLevels);
+    var rawLevelCount = Object.keys(PDC_USERS_STATE.selectedLevelIds).length;
+    var selectAllLevels = document.getElementById('bulk-select-all-levels');
+    var selectAllUsers = document.getElementById('btn-select-all-users');
+
+    if (selectAllLevels) {
+        selectAllLevels.checked = allLevels.length > 0 && rawLevelCount === allLevels.length;
+        selectAllLevels.indeterminate = rawLevelCount > 0 && rawLevelCount < allLevels.length;
+    }
+    if (selectAllUsers) {
+        selectAllUsers.textContent = userCount > 0 && userCount === PDC_USERS_STATE.users.length ? 'Tout désélectionner' : 'Tout sélectionner';
+    }
+    summary.textContent = userCount + ' utilisateur(s), ' + levelCount + ' niveau(x), jusqu’à ' + changeCount + ' droit(s) concernés.';
+    applyButton.disabled = changeCount === 0;
+}
+
+function applyBulkRights() {
+    var usernames = Object.keys(PDC_USERS_STATE.selectedUsernames);
+    var levelIds = getBulkLevelIds();
+    var roleSelect = document.getElementById('bulk-role-select');
+    var applyButton = document.getElementById('btn-apply-bulk-role');
+    var role = roleSelect ? roleSelect.value : '';
+    var changeCount = usernames.length * levelIds.length;
+
+    if (!changeCount || !window.confirm('Appliquer le droit « ' + (role || 'Hérité') + ' » à ' + usernames.length + ' utilisateur(s) sur ' + levelIds.length + ' niveau(x) ?')) {
+        return;
+    }
+
+    applyButton.disabled = true;
+    const formData = new FormData();
+    formData.append('action', 'set_bulk_user_scope_roles');
+    formData.append('usernames', JSON.stringify(usernames));
+    formData.append('level_ids', JSON.stringify(levelIds));
+    formData.append('role', role);
+
+    fetch('<?php echo APP_URL; ?>/api.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Erreur inconnue');
+        }
+        usernames.forEach(function(username) {
+            levelIds.forEach(function(levelId) {
+                var key = username + '::hierarchie:' + levelId;
+                if (role === '') {
+                    delete PDC_USERS_STATE.roles[key];
+                } else {
+                    PDC_USERS_STATE.roles[key] = [role];
+                }
+            });
+        });
+        renderRolesMatrix();
+        alert(data.updated + ' droit(s) mis à jour.');
+    })
+    .catch(error => {
+        console.error('Erreur de mise à jour groupée:', error);
+        alert('La mise à jour groupée a échoué : ' + error.message);
+    })
+    .finally(function() {
+        updateBulkRightsSummary();
     });
 }
 
@@ -769,6 +938,27 @@ function getRoleForScope(username, scope) {
         return '';
     }
     return PDC_USERS_STATE.roles[key][0];
+}
+
+function getEffectiveRoleForLevel(username, levelId) {
+    var levels = [];
+    var byId = {};
+    flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, levels);
+    levels.forEach(function(level) {
+        byId[parseInt(level.id, 10)] = level;
+    });
+
+    var currentId = parseInt(levelId, 10) || 0;
+    var visited = {};
+    while (currentId > 0 && !visited[currentId]) {
+        visited[currentId] = true;
+        var directRole = getRoleForScope(username, 'hierarchie:' + currentId);
+        if (directRole !== '') {
+            return directRole;
+        }
+        currentId = byId[currentId] ? byId[currentId].parentId : 0;
+    }
+    return '';
 }
 
 function renderRolesMatrix() {
@@ -794,11 +984,31 @@ function renderRolesMatrix() {
     title.textContent = selectedUser ? ('Droits de ' + (selectedUser.displayname || selectedUser.username)) : ('Droits de ' + PDC_USERS_STATE.selectedUsername);
 
     var isGlobalAdmin = getRoleForScope(PDC_USERS_STATE.selectedUsername, '*') === 'admin';
+    var selectedViewLevel = selectedUser ? (parseInt(selectedUser.niveau_id, 10) || 0) : 0;
+    var viewLevels = [];
+    flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, viewLevels);
+    var viewOptions = '<option value="0">Toute la hiérarchie</option>';
+    viewLevels.forEach(function(level) {
+        viewOptions += '<option value="' + level.id + '"' + (parseInt(level.id, 10) === selectedViewLevel ? ' selected' : '') + '>' +
+            htmlEscape(new Array(level.depth + 1).join('— ') + level.nom) + '</option>';
+    });
     globalAdminBox.innerHTML =
+        '<div class="pdc-user-view-level">' +
+            '<label for="user-view-level-select">Niveau de vue</label>' +
+            '<select class="form-select form-select-sm" id="user-view-level-select">' + viewOptions + '</select>' +
+            '<small>Ce niveau devient la racine des hiérarchies affichées.</small>' +
+        '</div>' +
         '<label class="pdc-global-admin-label">' +
             '<input type="checkbox" id="global-admin-checkbox" ' + (isGlobalAdmin ? 'checked' : '') + '>' +
             '<span>Administrateur application (global)</span>' +
         '</label>';
+
+    var viewLevelSelect = document.getElementById('user-view-level-select');
+    if (viewLevelSelect) {
+        viewLevelSelect.addEventListener('change', function() {
+            setUserViewLevel(PDC_USERS_STATE.selectedUsername, parseInt(this.value, 10) || 0, this);
+        });
+    }
 
     var globalCheckbox = document.getElementById('global-admin-checkbox');
     if (globalCheckbox) {
@@ -813,6 +1023,7 @@ function renderRolesMatrix() {
     rows.forEach(function(item) {
         var scope = 'hierarchie:' + item.id;
         var role = getRoleForScope(PDC_USERS_STATE.selectedUsername, scope);
+        var inheritedRole = role === '' ? getEffectiveRoleForLevel(PDC_USERS_STATE.selectedUsername, item.parentId) : '';
         var tr = document.createElement('tr');
         tr.className = item.actif ? '' : 'pdc-role-row-inactive';
         var radioName = 'role_scope_' + item.id;
@@ -824,11 +1035,15 @@ function renderRolesMatrix() {
             '</span>';
 
         tr.innerHTML =
-            '<td>' + label + '</td>' +
+            '<td><input type="checkbox" class="pdc-bulk-level-checkbox" data-level-id="' + item.id + '" aria-label="Sélectionner ' + htmlEscape(item.nom) + '"' + (PDC_USERS_STATE.selectedLevelIds[item.id] ? ' checked' : '') + '> ' + label + '</td>' +
             '<td>' +
                 '<div class="pdc-role-radios" data-username="' + htmlEscape(PDC_USERS_STATE.selectedUsername) + '" data-scope="' + htmlEscape(scope) + '" data-old-value="' + htmlEscape(role) + '">' +
                     '<label class="pdc-role-radio-option">' +
-                        '<input type="radio" class="role-radio" name="' + radioName + '" value=""' + (role === '' ? ' checked' : '') + '> Aucun' +
+                        '<input type="radio" class="role-radio" name="' + radioName + '" value=""' + (role === '' ? ' checked' : '') + '> Hérité' +
+                        ' <span class="pdc-inherited-role">(' + (inheritedRole && inheritedRole !== 'aucun' ? htmlEscape(inheritedRole) : 'aucun') + ')</span>' +
+                    '</label>' +
+                    '<label class="pdc-role-radio-option">' +
+                        '<input type="radio" class="role-radio" name="' + radioName + '" value="aucun"' + (role === 'aucun' ? ' checked' : '') + '> Aucun' +
                     '</label>' +
                     '<label class="pdc-role-radio-option">' +
                         '<input type="radio" class="role-radio" name="' + radioName + '" value="lecteur"' + (role === 'lecteur' ? ' checked' : '') + '> Lecteur' +
@@ -844,6 +1059,18 @@ function renderRolesMatrix() {
     document.querySelectorAll('.role-radio').forEach(function(radio) {
         radio.addEventListener('change', setUserScopeRole);
     });
+
+    document.querySelectorAll('.pdc-bulk-level-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                PDC_USERS_STATE.selectedLevelIds[this.dataset.levelId] = true;
+            } else {
+                delete PDC_USERS_STATE.selectedLevelIds[this.dataset.levelId];
+            }
+            updateBulkRightsSummary();
+        });
+    });
+    updateBulkRightsSummary();
 }
 
 function setUserGlobalAdmin(username, enabled, checkbox) {
@@ -874,6 +1101,30 @@ function setUserGlobalAdmin(username, enabled, checkbox) {
         checkbox.checked = oldChecked;
         alert('Erreur lors de la mise à jour du rôle admin global: ' + error.message);
     });
+}
+
+function setUserViewLevel(username, niveauId, select) {
+    var selectedUser = PDC_USERS_STATE.users.find(function(user) { return user.username === username; });
+    var oldValue = selectedUser ? (parseInt(selectedUser.niveau_id, 10) || 0) : 0;
+    const formData = new FormData();
+    formData.append('action', 'set_user_view_level');
+    formData.append('username', username);
+    formData.append('niveau_id', niveauId);
+
+    select.disabled = true;
+    fetch('<?php echo APP_URL; ?>/api.php', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Erreur inconnue');
+            if (selectedUser) selectedUser.niveau_id = data.niveau_id;
+        })
+        .catch(error => {
+            select.value = String(oldValue);
+            alert('Erreur lors de la mise à jour du niveau de vue : ' + error.message);
+        })
+        .finally(function() {
+            select.disabled = false;
+        });
 }
 
 function htmlEscape(text) {
@@ -923,6 +1174,7 @@ function setUserScopeRole(e) {
                 PDC_USERS_STATE.roles[key] = [role];
             }
             wrapper.dataset.oldValue = role;
+            renderRolesMatrix();
         } else {
             console.error('Erreur:', data.error);
             const oldInput = wrapper.querySelector('input.role-radio[value="' + oldValue + '"]');
@@ -958,11 +1210,8 @@ function initLdapUserSearch() {
     });
 
     searchBtn.addEventListener('click', searchLdapUsers);
-    queryInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            searchLdapUsers();
-        }
+    queryInput.addEventListener('input', function() {
+        searchLdapUsers();
     });
 }
 
@@ -971,7 +1220,7 @@ function searchLdapUsers() {
     const results = document.getElementById('ldap-search-results');
     const query = queryInput.value.trim();
 
-    if (query.length < 2) {
+    if (query.length < 1) {
         results.innerHTML = '<div class="alert alert-warning">Saisissez au moins 2 caractères.</div>';
         return;
     }
@@ -980,7 +1229,7 @@ function searchLdapUsers() {
     formData.append('action', 'search_ldap_users');
     formData.append('query', query);
 
-    results.innerHTML = '<div class="text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Recherche LDAP...</div>';
+    results.innerHTML = '<div class="text-muted"><i class="fa-solid fa-spinner fa-spin"></i> Recherche dans l\'annuaire...</div>';
 
     fetch('<?php echo APP_URL; ?>/api.php', {
         method: 'POST',
@@ -1018,8 +1267,8 @@ function searchLdapUsers() {
         });
     })
     .catch(error => {
-        console.error('Erreur LDAP:', error);
-        results.innerHTML = '<div class="alert alert-danger">Erreur lors de la recherche LDAP.</div>';
+        console.error('Erreur annuaire:', error);
+        results.innerHTML = '<div class="alert alert-danger">Erreur lors de la recherche dans l\'annuaire.</div>';
     });
 }
 

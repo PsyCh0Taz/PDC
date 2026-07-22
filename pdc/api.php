@@ -20,6 +20,10 @@ $roleRank = array(
 );
 
 $userHasMinRoleOnHierarchy = function($hierarchieId, $minRole) use ($currentUser, $roleRank) {
+    $viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
+    if (!Hierarchie::isInView((int)$hierarchieId, $viewLevelId)) {
+        return false;
+    }
     $scope = 'hierarchie:' . (int)$hierarchieId;
     if (!isset($currentUser['roles'][$scope])) {
         return false;
@@ -273,7 +277,7 @@ try {
             if (!$isAdmin) throw new Exception('Accès refusé');
             
             $db = Database::getInstance();
-            $users = $db->fetchAll('SELECT DISTINCT username, displayname, dn, email FROM pdc_utilisateurs ORDER BY displayname');
+            $users = $db->fetchAll('SELECT DISTINCT username, displayname, dn, email, COALESCE(niveau_id, 0) AS niveau_id FROM pdc_utilisateurs ORDER BY displayname');
             $roles = $db->fetchAll('SELECT * FROM pdc_utilisateurs_roles');
             $hierarchie = Hierarchie::getAll(false);
             
@@ -346,7 +350,7 @@ try {
             $scope = isset($_POST['scope']) ? trim($_POST['scope']) : '';
             $role = isset($_POST['role']) ? trim($_POST['role']) : '';
 
-            $allowedRoles = array('', 'lecteur', 'modificateur');
+            $allowedRoles = array('', 'aucun', 'lecteur', 'modificateur');
             if (!$username || !$scope || !in_array($role, $allowedRoles, true)) {
                 throw new Exception('Paramètres invalides');
             }
@@ -375,6 +379,76 @@ try {
             );
 
             echo json_encode(array('success' => true));
+            break;
+
+        case 'set_bulk_user_scope_roles':
+            if (!$isAdmin) throw new Exception('Accès refusé');
+
+            $usernames = json_decode(isset($_POST['usernames']) ? $_POST['usernames'] : '[]', true);
+            $levelIds = json_decode(isset($_POST['level_ids']) ? $_POST['level_ids'] : '[]', true);
+            $role = isset($_POST['role']) ? trim($_POST['role']) : '';
+            $allowedRoles = array('', 'aucun', 'lecteur', 'modificateur');
+
+            if (!is_array($usernames) || !is_array($levelIds) || !in_array($role, $allowedRoles, true)) {
+                throw new Exception('Paramètres invalides');
+            }
+
+            $usernames = array_values(array_unique(array_filter(array_map('trim', $usernames), 'strlen')));
+            $levelIds = array_values(array_unique(array_filter(array_map('intval', $levelIds), function($id) { return $id > 0; })));
+            $operationCount = count($usernames) * count($levelIds);
+
+            if ($operationCount === 0 || $operationCount > 50000) {
+                throw new Exception($operationCount > 50000 ? 'Trop de modifications en une seule opération (maximum 50 000)' : 'Sélection vide');
+            }
+
+            $db = Database::getInstance();
+            $validUsers = array();
+            foreach ($db->fetchAll('SELECT username FROM pdc_utilisateurs') as $row) {
+                $validUsers[$row['username']] = true;
+            }
+            $validLevels = array();
+            foreach ($db->fetchAll('SELECT id FROM pdc_hierarchie') as $row) {
+                $validLevels[(int)$row['id']] = true;
+            }
+
+            foreach ($usernames as $username) {
+                if (!isset($validUsers[$username])) throw new Exception('Utilisateur inconnu : ' . $username);
+            }
+            foreach ($levelIds as $levelId) {
+                if (!isset($validLevels[$levelId])) throw new Exception('Niveau hiérarchique inconnu : ' . $levelId);
+            }
+
+            $pdo = $db->getPdo();
+            $pdo->beginTransaction();
+            try {
+                foreach ($usernames as $username) {
+                    foreach ($levelIds as $levelId) {
+                        $scope = 'hierarchie:' . $levelId;
+                        $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, $scope));
+                        if ($role !== '') {
+                            $db->insert(
+                                'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                                array($username, $scope, $role)
+                            );
+                        }
+                    }
+                }
+                $pdo->commit();
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
+
+            Journal::logModification(
+                $currentUser['username'],
+                Journal::getIp(),
+                'SET_BULK_SCOPE_ROLE',
+                'user',
+                0,
+                count($usernames) . ' utilisateur(s), ' . count($levelIds) . ' niveau(x), rôle : ' . ($role !== '' ? $role : 'aucun')
+            );
+
+            echo json_encode(array('success' => true, 'updated' => $operationCount));
             break;
 
         case 'set_user_global_admin':
@@ -409,15 +483,46 @@ try {
             echo json_encode(array('success' => true));
             break;
 
+        case 'set_user_view_level':
+            if (!$isAdmin) throw new Exception('Accès refusé');
+
+            $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+            $niveauId = isset($_POST['niveau_id']) ? (int)$_POST['niveau_id'] : 0;
+            if ($username === '') throw new Exception('Utilisateur invalide');
+
+            $db = Database::getInstance();
+            $user = $db->fetchOne('SELECT username FROM pdc_utilisateurs WHERE username = ?', array($username));
+            if (!$user) throw new Exception('Utilisateur introuvable');
+            if ($niveauId > 0 && !Hierarchie::getById($niveauId, false)) {
+                throw new Exception('Niveau de vue introuvable');
+            }
+
+            $db->execute(
+                'UPDATE pdc_utilisateurs SET niveau_id = ? WHERE username = ?',
+                array($niveauId > 0 ? $niveauId : null, $username)
+            );
+
+            Journal::logModification(
+                $currentUser['username'],
+                Journal::getIp(),
+                'SET_VIEW_LEVEL',
+                'utilisateur',
+                0,
+                "Niveau de vue de $username : " . ($niveauId > 0 ? $niveauId : 'toute la hiérarchie')
+            );
+
+            echo json_encode(array('success' => true, 'niveau_id' => $niveauId));
+            break;
+
         case 'search_ldap_users':
             if (!$isAdmin) throw new Exception('Accès refusé');
 
             $query = isset($_POST['query']) ? trim($_POST['query']) : '';
-            if (strlen($query) < 2) {
+            if (strlen($query) < 1) {
                 throw new Exception('La recherche doit contenir au moins 2 caractères');
             }
 
-            $users = Auth::searchUsers($query, 25);
+            $users = Auth::searchExternalUsers($query, 25);
             echo json_encode(array('success' => true, 'users' => $users));
             break;
 
@@ -425,13 +530,19 @@ try {
             if (!$isAdmin) throw new Exception('Accès refusé');
 
             $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-            $dn = isset($_POST['dn']) ? trim($_POST['dn']) : '';
+            $dn = '';
             $displayname = isset($_POST['displayname']) ? trim($_POST['displayname']) : '';
             $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 
-            if ($username === '' || $dn === '') {
+            if ($username === '') {
                 throw new Exception('Utilisateur LDAP invalide');
             }
+
+            $ldapUser = LDAP::findUserByUsername($username);
+            if ($ldapUser === false || empty($ldapUser['dn'])) {
+                throw new Exception('Utilisateur introuvable dans LDAP');
+            }
+            $dn = $ldapUser['dn'];
 
             if ($displayname === '') {
                 $displayname = $username;

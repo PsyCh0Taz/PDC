@@ -44,13 +44,30 @@ class Auth {
             return self::loginOffline($username, $password);
         }
 
-        $info = LDAP::authenticateUser($username, $password);
-        if ($info === false) {
+        // En mode online, la base locale constitue la liste blanche des comptes.
+        $db = Database::getInstance();
+        $user = $db->fetchOne(
+            'SELECT username, displayname, dn, email FROM pdc_utilisateurs WHERE username = ?',
+            array($username)
+        );
+        if (!$user || empty($user['dn'])) {
             return false;
         }
 
+        // Le mot de passe reste vérifié par LDAP, avec le DN enregistré en base.
+        if (!LDAP::bindUserDn($user['dn'], $password)) {
+            return false;
+        }
+
+        $info = array(
+            'username'    => $user['username'],
+            'dn'          => $user['dn'],
+            'displayname' => !empty($user['displayname']) ? $user['displayname'] : $user['username'],
+            'mail'        => !empty($user['email']) ? $user['email'] : '',
+        );
+
         // Charger les rôles depuis MySQL
-        $info['roles'] = self::loadRoles($username);
+        $info['roles'] = self::loadRoles($user['username']);
 
         return $info;
     }
@@ -64,9 +81,47 @@ class Auth {
             'SELECT role_dn, role FROM pdc_utilisateurs_roles WHERE username = ?',
             array($username)
         );
-        $roles = array();
+        $directRoles = array();
         foreach ($rows as $row) {
-            $roles[$row['role_dn']] = $row['role'];
+            $directRoles[$row['role_dn']] = $row['role'];
+        }
+
+        $roles = array();
+        if (isset($directRoles['*']) && $directRoles['*'] === 'admin') {
+            $roles['*'] = 'admin';
+        }
+
+        $levels = $db->fetchAll('SELECT id, id_parent FROM pdc_hierarchie');
+        $parents = array();
+        foreach ($levels as $level) {
+            $parents[(int)$level['id']] = (int)$level['id_parent'];
+        }
+
+        $resolved = array();
+        $resolving = array();
+        $resolveRole = function($levelId) use (&$resolveRole, &$resolved, &$resolving, $parents, $directRoles) {
+            if (array_key_exists($levelId, $resolved)) return $resolved[$levelId];
+            if (isset($resolving[$levelId])) return '';
+            $resolving[$levelId] = true;
+
+            $scope = 'hierarchie:' . $levelId;
+            if (array_key_exists($scope, $directRoles)) {
+                $role = $directRoles[$scope];
+            } else {
+                $parentId = isset($parents[$levelId]) ? $parents[$levelId] : 0;
+                $role = $parentId > 0 ? $resolveRole($parentId) : '';
+            }
+
+            unset($resolving[$levelId]);
+            $resolved[$levelId] = $role;
+            return $role;
+        };
+
+        foreach ($parents as $levelId => $parentId) {
+            $role = $resolveRole($levelId);
+            if ($role === 'lecteur' || $role === 'modificateur') {
+                $roles['hierarchie:' . $levelId] = $role;
+            }
         }
         return $roles;
     }
@@ -96,7 +151,14 @@ class Auth {
         }
         // Rafraîchit les rôles
         $_SESSION['user']['roles'] = self::loadRoles($_SESSION['user']['username']);
+        $_SESSION['user']['niveau_id'] = self::loadViewLevel($_SESSION['user']['username']);
         return $_SESSION['user'];
+    }
+
+    public static function loadViewLevel($username) {
+        $db = Database::getInstance();
+        $row = $db->fetchOne('SELECT niveau_id FROM pdc_utilisateurs WHERE username = ?', array($username));
+        return $row && !empty($row['niveau_id']) ? (int)$row['niveau_id'] : 0;
     }
 
     /**
@@ -129,6 +191,61 @@ class Auth {
      */
     public static function searchUsers($query, $limit = 20) {
         return LDAP::searchUsers($query, $limit);
+    }
+
+    /**
+     * Recherche des utilisateurs dans l'annuaire HTTP externe.
+     */
+    public static function searchExternalUsers($query, $limit = 25) {
+        $query = trim((string)$query);
+        if ($query === '') return array();
+
+        $url = ANNUAIRE_SEARCH_URL . '?query=' . rawurlencode($query);
+        $context = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => 5,
+                'ignore_errors' => true,
+                'header' => "Accept: application/json\r\nConnection: close\r\n",
+            ),
+        ));
+        $json = @file_get_contents($url, false, $context);
+        if ($json === false) {
+            throw new Exception('Le service d\'annuaire externe est indisponible.');
+        }
+
+        $payload = json_decode($json, true);
+        if (!is_array($payload)) {
+            throw new Exception('La réponse du service d\'annuaire est invalide.');
+        }
+
+        $entries = isset($payload['hits']['hits']) && is_array($payload['hits']['hits'])
+            ? $payload['hits']['hits']
+            : $payload;
+        $users = array();
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) continue;
+            $source = isset($entry['_source']) && is_array($entry['_source']) ? $entry['_source'] : $entry;
+            $username = isset($source['uid']) ? trim((string)$source['uid']) : '';
+            if ($username === '' && isset($source['pnia'])) $username = trim((string)$source['pnia']);
+            if ($username === '' && isset($entry['_id'])) $username = trim((string)$entry['_id']);
+            if ($username === '') continue;
+
+            $dn = '';
+            if (!empty($source['dn'])) $dn = trim((string)$source['dn']);
+            elseif (!empty($source['distinguishedname'])) $dn = trim((string)$source['distinguishedname']);
+            elseif (!empty($source['distinguishedName'])) $dn = trim((string)$source['distinguishedName']);
+
+            $users[] = array(
+                'username' => $username,
+                'displayname' => !empty($source['nomcomplet']) ? (string)$source['nomcomplet'] : $username,
+                'dn' => $dn,
+                'email' => !empty($source['email']) && $source['email'] !== '---' ? (string)$source['email'] : '',
+            );
+            if (count($users) >= (int)$limit) break;
+        }
+
+        return $users;
     }
 
 }

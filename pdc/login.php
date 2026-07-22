@@ -43,12 +43,27 @@ $pageTitle = 'Connexion';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <script>
+        (function() {
+            var theme = null;
+            try { theme = localStorage.getItem('pdc.theme'); } catch (e) {}
+            if (theme !== 'light' && theme !== 'dark') {
+                theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        }());
+    </script>
     <title>Connexion — <?php echo APP_NAME; ?></title>
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
 </head>
 <body class="pdc-login-page">
+<button type="button" class="btn pdc-theme-toggle pdc-theme-toggle-floating" data-pdc-theme-toggle aria-label="Activer le thème sombre" title="Changer de thème">
+    <i class="fa-solid fa-moon" aria-hidden="true"></i>
+    <span class="pdc-theme-toggle-label">Thème sombre</span>
+</button>
 <div class="pdc-login-shell">
     <div class="pdc-login-container">
         <div class="pdc-login-logo">
@@ -100,5 +115,6 @@ $pageTitle = 'Connexion';
 </div>
 <script src="<?php echo APP_URL; ?>/assets/js/jquery.min.js"></script>
 <script src="<?php echo APP_URL; ?>/assets/js/bootstrap.bundle.min.js"></script>
+<script src="<?php echo APP_URL; ?>/assets/theme.js"></script>
 </body>
 </html>

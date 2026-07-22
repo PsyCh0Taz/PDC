@@ -11,6 +11,8 @@ $setupSessionKey = 'setup_local_auth';
 $error = '';
 $dbResult = null;
 $ldapResult = null;
+$ldapDnSearchResult = null;
+$ldapSearchDn = LDAP_BASE_DN;
 $configResult = null;
 $configFile = __DIR__ . '/../config/config.php';
 
@@ -34,6 +36,21 @@ function setupReplaceDefineBool($content, $constantName, $value) {
     $pattern = "/define\\(\\s*'" . preg_quote($constantName, '/') . "'\\s*,\\s*(true|false)\\s*\\);/i";
     $replacement = "define('" . $constantName . "',     " . ($value ? 'true' : 'false') . ');';
     return preg_replace($pattern, $replacement, $content, 1);
+}
+
+function setupExpectedDatabaseSchema() {
+    return array(
+        'pdc_hierarchie' => array('id', 'nom', 'id_parent', 'ordre', 'actif'),
+        'pdc_domaines' => array('id', 'hierarchie_id', 'nom', 'ordre'),
+        'pdc_projets' => array('id', 'domaine_id', 'titre', 'date_debut', 'date_fin', 'ordre'),
+        'pdc_projet_gradients' => array('id', 'projet_id', 'date_gradient', 'couleur', 'libelle'),
+        'pdc_projet_jalons' => array('id', 'projet_id', 'date_jalon', 'couleur', 'libelle', 'jalon_reference_id'),
+        'pdc_utilisateurs' => array('username', 'displayname', 'dn', 'email', 'niveau_id'),
+        'pdc_utilisateurs_roles' => array('username', 'role_dn', 'role'),
+        'pdc_parametres' => array('cle', 'valeur'),
+        'pdc_journal_modifications' => array('username', 'ip', 'action', 'entite', 'entite_id', 'description', 'date_heure'),
+        'pdc_journal_connexions' => array('username', 'ip', 'via_partage', 'share_token', 'date_heure'),
+    );
 }
 
 $configValues = array(
@@ -81,7 +98,7 @@ if (empty($_SESSION[$setupSessionKey])) {
         <title>Setup - Connexion</title>
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
-        <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+        <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
     </head>
     <body class="pdc-login-page">
     <div class="pdc-login-shell">
@@ -267,9 +284,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 'detail' => 'Requete executee et resultat recupere.',
             );
 
+            $currentStep = 'Controle du schema des tables de donnees';
+            $expectedSchema = setupExpectedDatabaseSchema();
+            $schemaStmt = $pdo->prepare(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS '
+                . 'WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION'
+            );
+            $schemaStmt->execute(array(DB_NAME));
+            $actualSchema = array();
+            foreach ($schemaStmt->fetchAll(PDO::FETCH_ASSOC) as $column) {
+                $tableName = $column['TABLE_NAME'];
+                if (!isset($actualSchema[$tableName])) {
+                    $actualSchema[$tableName] = array();
+                }
+                $actualSchema[$tableName][] = $column['COLUMN_NAME'];
+            }
+
+            $missingTables = array();
+            $missingColumns = array();
+            foreach ($expectedSchema as $tableName => $expectedColumns) {
+                if (!isset($actualSchema[$tableName])) {
+                    $missingTables[] = $tableName;
+                    continue;
+                }
+
+                $missing = array_values(array_diff($expectedColumns, $actualSchema[$tableName]));
+                if (!empty($missing)) {
+                    $missingColumns[$tableName] = $missing;
+                }
+            }
+
+            if (!empty($missingTables) || !empty($missingColumns)) {
+                $problems = array();
+                if (!empty($missingTables)) {
+                    $problems[] = 'tables absentes : ' . implode(', ', $missingTables);
+                }
+                foreach ($missingColumns as $tableName => $columns) {
+                    $problems[] = $tableName . ' (colonnes absentes : ' . implode(', ', $columns) . ')';
+                }
+                throw new Exception('Schema incomplet - ' . implode(' ; ', $problems) . '.');
+            }
+
+            $steps[] = array(
+                'label' => $currentStep,
+                'status' => 'ok',
+                'detail' => count($expectedSchema) . ' tables controlees, toutes les colonnes obligatoires sont presentes.',
+            );
+
             $dbResult = array(
                 'success' => true,
-                'message' => 'Connexion a la base reussie.',
+                'message' => 'Connexion a la base et controle du schema reussis.',
                 'details' => $row,
                 'query' => $sqlTestQuery,
                 'steps' => $steps,
@@ -294,6 +358,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         $ldapResult = LDAP::runConnectionDiagnostic($ldapFilter, 500);
     }
+
+    if ($_POST['action'] === 'search_ldap_dn') {
+        $ldapSearchDn = isset($_POST['ldap_search_dn']) ? trim((string)$_POST['ldap_search_dn']) : '';
+        try {
+            $ldapDnSearchResult = LDAP::searchFromDn($ldapSearchDn, 100);
+        } catch (Exception $e) {
+            $ldapDnSearchResult = array(
+                'success' => false,
+                'message' => $e->getMessage(),
+            );
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -304,7 +380,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <title>Setup - Tests techniques</title>
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
 </head>
 <body>
 <div class="container py-5">
@@ -326,6 +402,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </div>
     <?php endif; ?>
 
+    <?php
+    $activeSetupTab = 'config';
+    if ($dbResult !== null) {
+        $activeSetupTab = 'database';
+    } elseif ($ldapResult !== null || $ldapDnSearchResult !== null) {
+        $activeSetupTab = 'ldap';
+    }
+    ?>
+    <ul class="nav nav-tabs mb-4" id="setupTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link <?php echo ($activeSetupTab === 'config') ? 'active' : ''; ?>" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-pane" type="button" role="tab" aria-controls="config-pane" aria-selected="<?php echo ($activeSetupTab === 'config') ? 'true' : 'false'; ?>">
+                <i class="fa-solid fa-sliders"></i> Parametres
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link <?php echo ($activeSetupTab === 'database') ? 'active' : ''; ?>" id="database-tab" data-bs-toggle="tab" data-bs-target="#database-pane" type="button" role="tab" aria-controls="database-pane" aria-selected="<?php echo ($activeSetupTab === 'database') ? 'true' : 'false'; ?>">
+                <i class="fa-solid fa-database"></i> Base de donnees
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link <?php echo ($activeSetupTab === 'ldap') ? 'active' : ''; ?>" id="ldap-tab" data-bs-toggle="tab" data-bs-target="#ldap-pane" type="button" role="tab" aria-controls="ldap-pane" aria-selected="<?php echo ($activeSetupTab === 'ldap') ? 'true' : 'false'; ?>">
+                <i class="fa-solid fa-network-wired"></i> LDAP
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="setupTabsContent">
+    <div class="tab-pane fade <?php echo ($activeSetupTab === 'config') ? 'show active' : ''; ?>" id="config-pane" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
     <div class="card shadow-sm mb-4">
         <div class="card-header">
             <strong><i class="fa-solid fa-sliders"></i> Parametres de configuration (config/config.php)</strong>
@@ -402,9 +506,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             </form>
         </div>
     </div>
+    </div>
 
-    <div class="row g-4">
-        <div class="col-12 col-lg-6">
+    <div class="tab-pane fade <?php echo ($activeSetupTab === 'database') ? 'show active' : ''; ?>" id="database-pane" role="tabpanel" aria-labelledby="database-tab" tabindex="0">
             <div class="card h-100 shadow-sm">
                 <div class="card-header">
                     <strong><i class="fa-solid fa-database"></i> Test connexion base de donnees</strong>
@@ -452,9 +556,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
 
-        <div class="col-12 col-lg-6">
+    </div>
+
+    <div class="tab-pane fade <?php echo ($activeSetupTab === 'ldap') ? 'show active' : ''; ?>" id="ldap-pane" role="tabpanel" aria-labelledby="ldap-tab" tabindex="0">
             <div class="card h-100 shadow-sm">
                 <div class="card-header">
                     <strong><i class="fa-solid fa-network-wired"></i> Test connexion LDAP</strong>
@@ -507,8 +612,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
+
+            <div class="card shadow-sm mt-4">
+                <div class="card-header">
+                    <strong><i class="fa-solid fa-magnifying-glass"></i> Recherche libre depuis un DN</strong>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">Recherche jusqu'a 100 entrees dans toute la sous-arborescence du DN indique.</p>
+                    <form method="post" action="" class="row g-3">
+                        <input type="hidden" name="action" value="search_ldap_dn">
+                        <div class="col-12">
+                            <label class="form-label" for="ldap_search_dn">DN de depart</label>
+                            <input type="text" class="form-control" id="ldap_search_dn" name="ldap_search_dn" value="<?php echo htmlspecialchars($ldapSearchDn, ENT_QUOTES, 'UTF-8'); ?>" placeholder="ou=Utilisateurs,dc=exemple,dc=fr" required>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Rechercher dans LDAP</button>
+                        </div>
+                    </form>
+
+                    <?php if ($ldapDnSearchResult !== null): ?>
+                    <div class="mt-3 alert <?php echo $ldapDnSearchResult['success'] ? 'alert-success' : 'alert-danger'; ?>" role="alert">
+                        <?php echo htmlspecialchars($ldapDnSearchResult['message'], ENT_QUOTES, 'UTF-8'); ?>
+                    </div>
+                    <?php if (!empty($ldapDnSearchResult['success'])): ?>
+                    <ul class="list-group list-group-flush mt-2">
+                        <li class="list-group-item"><strong>DN de depart:</strong> <?php echo htmlspecialchars($ldapDnSearchResult['base_dn'], ENT_QUOTES, 'UTF-8'); ?></li>
+                        <li class="list-group-item"><strong>Filtre:</strong> <code><?php echo htmlspecialchars($ldapDnSearchResult['filter'], ENT_QUOTES, 'UTF-8'); ?></code></li>
+                        <li class="list-group-item"><strong>Nombre d'entrees:</strong> <?php echo (int)$ldapDnSearchResult['count']; ?></li>
+                    </ul>
+                    <div class="mt-3">
+                        <label class="form-label"><strong>Resultat de la recherche (JSON)</strong></label>
+                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapDnSearchResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                    </div>
+                    <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+    </div>
     </div>
 </div>
+<script src="<?php echo APP_URL; ?>/assets/js/bootstrap.bundle.js"></script>
 </body>
 </html>

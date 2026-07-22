@@ -10,11 +10,22 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <script>
+        (function() {
+            var theme = null;
+            try { theme = localStorage.getItem('pdc.theme'); } catch (e) {}
+            if (theme !== 'light' && theme !== 'dark') {
+                theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        }());
+    </script>
     <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?> — <?php echo APP_NAME; ?></title>
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/jquery-ui.min.css">
-    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/pdc.css">
+    <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
     <script src="<?php echo APP_URL; ?>/assets/tinymce/tinymce.min.js" referrerpolicy="origin"></script>
 </head>
 <body>
@@ -53,6 +64,12 @@ $pageTitle = ( OFFLINE_MODE  ? $pageTitle . ' (Mode Offline)' : $pageTitle );
                 </a>
                 <?php endif; ?>
                 <div class="collapse navbar-collapse justify-content-end" id="pdc-nav">
+                    <!--
+                    <button type="button" class="btn pdc-theme-toggle" data-pdc-theme-toggle aria-label="Activer le thème sombre" title="Changer de thème">
+                        <i class="fa-solid fa-moon" aria-hidden="true"></i>
+                        <span class="pdc-theme-toggle-label">Thème sombre</span>
+                    </button>
+                    -->
                     <?php if (!empty($currentUser)): ?>
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item dropdown">
