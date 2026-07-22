@@ -586,12 +586,15 @@
             return;
         }
 
+        var editorTheme = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+
+
         tinymce.init({
             selector: '#new-projet-commentaire, #projet-commentaire, #domaine-commentaire',
             license_key: 'gpl',
             promotion: false,
-            skin: true,
-            content_css: false,
+            skin: editorTheme === 'dark' ? 'oxide-dark' : 'oxide',
+            content_css: editorTheme === 'dark' ? 'dark' : 'default',
             menubar: false,
             branding: false,
             statusbar: false,
@@ -599,6 +602,16 @@
             plugins: '',
             toolbar: 'undo redo | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | blockquote | removeformat',
             content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }'
+        });
+
+        document.addEventListener('pdc:themechange', function(event) {
+            var dark = event.detail && event.detail.theme === 'dark';
+            tinymce.editors.forEach(function(editor) {
+                var body = editor.getBody();
+                if (!body) return;
+                body.style.color = dark ? '#dee2e6' : '#212529';
+                body.style.backgroundColor = dark ? '#212529' : '#ffffff';
+            });
         });
     }
 

@@ -239,21 +239,21 @@ include __DIR__ . '/includes/header.php';
 
         <?php if ($showNoReadAlert): ?>
         <br>
-        <div class="alert alert-warning" role="alert" style="margin-bottom: 15px;">
+        <div class="alert alert-warning mb-3" role="alert">
             <i class="fa-solid fa-triangle-exclamation"></i>
             Vous n'avez pas les droits de lecture des domaines et projets sur ce niveau.
         </div>
         <?php endif; ?>
         <?php if ($showNoDomainReadOnlyAlert): ?>
         <br>
-        <div class="alert alert-info" role="alert" style="margin-bottom: 15px;">
+        <div class="alert alert-info mb-3" role="alert">
             <i class="fa-solid fa-circle-info"></i>
             Ce niveau ne contient actuellement aucun domaine et vous n'avez pas les droits de modification.
         </div>
         <?php endif; ?>
         <?php if ($showNoDomainEditableAlert): ?>
         <br>
-        <div class="alert alert-info" role="alert" style="margin-bottom: 15px;">
+        <div class="alert alert-info mb-3" role="alert">
             <i class="fa-solid fa-circle-info"></i>
             Ce niveau ne contient actuellement aucun domaine. Vous pouvez en ajouter un avec le bouton "+".
         </div>
@@ -274,9 +274,19 @@ include __DIR__ . '/includes/header.php';
                 </ul>
                 <div class="tab-content pdc-hierarchy-tab-content" id="pdc-hierarchy-tab-content">
                     <div class="tab-pane fade show active" id="pdc-sunburst-pane" role="tabpanel" aria-labelledby="pdc-sunburst-tab" tabindex="0">
+                        <div class="pdc-hierarchy-legend" aria-label="Légende des couleurs du Sunburst">
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-modifiable" aria-hidden="true"></span>Modifiable</span>
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-readonly" aria-hidden="true"></span>Lecture seule</span>
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-inaccessible" aria-hidden="true"></span>Inaccessible</span>
+                        </div>
                         <div id="pdc-sunburst" class="pdc-sunburst-canvas" aria-label="Sunburst interactif de la hiérarchie"></div>
                     </div>
                     <div class="tab-pane fade" id="pdc-force-tree-pane" role="tabpanel" aria-labelledby="pdc-force-tree-tab" tabindex="0">
+                        <div class="pdc-hierarchy-legend" aria-label="Légende des couleurs du Treeview">
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-modifiable" aria-hidden="true"></span>Modifiable</span>
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-readonly" aria-hidden="true"></span>Lecture seule</span>
+                            <span class="pdc-hierarchy-legend-item"><span class="pdc-hierarchy-legend-color is-inaccessible" aria-hidden="true"></span>Inaccessible</span>
+                        </div>
                         <div id="pdc-force-tree" class="pdc-force-tree-canvas" aria-label="Arbre de forces zoomable de la hiérarchie"></div>
                     </div>
                 </div>
@@ -598,7 +608,7 @@ include __DIR__ . '/includes/header.php';
                     <input class="form-check-input" type="checkbox" id="export-include-gradients" checked>
                     <label class="form-check-label" for="export-include-gradients">Afficher les gradients</label>
                 </div>
-                <div class="form-check" style="margin-top: 8px;">
+                <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" id="export-include-jalons" checked>
                     <label class="form-check-label" for="export-include-jalons">Afficher les jalons</label>
                 </div>

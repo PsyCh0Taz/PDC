@@ -377,7 +377,7 @@ include __DIR__ . '/includes/header.php';
 
                 <div class="tab-content">
                     <div role="tabpanel" class="tab-pane active" id="journal-modifications">
-                        <div class="pdc-journal-actions" style="margin-bottom: 20px;">
+                        <div class="pdc-journal-actions mb-4">
                             <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#purgeModificationsModal">
                                 <i class="fa-solid fa-trash"></i> Purger les modifications
                             </button>
@@ -412,7 +412,7 @@ include __DIR__ . '/includes/header.php';
                     </div>
 
                     <div role="tabpanel" class="tab-pane" id="journal-connexions">
-                        <div class="pdc-journal-actions" style="margin-bottom: 20px;">
+                        <div class="pdc-journal-actions mb-4">
                             <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#purgeConnexionsModal">
                                 <i class="fa-solid fa-trash"></i> Purger les connexions
                             </button>

@@ -96,12 +96,28 @@ if (empty($_SESSION[$setupSessionKey])) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="color-scheme" content="light dark">
+        <script>
+            (function () {
+                var theme = null;
+                try { theme = localStorage.getItem('pdc.theme'); } catch (e) {}
+                if (theme !== 'light' && theme !== 'dark') {
+                    theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            }());
+        </script>
         <title>Setup - Connexion</title>
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
         <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
     </head>
     <body class="pdc-login-page">
+    <button type="button" class="btn pdc-theme-toggle pdc-theme-toggle-floating" data-pdc-theme-toggle aria-label="Activer le thème sombre" aria-pressed="false">
+        <i class="fa-solid fa-moon" aria-hidden="true"></i>
+        <span class="pdc-theme-toggle-label">Thème sombre</span>
+    </button>
     <div class="pdc-login-shell">
         <div class="pdc-login-container">
             <div class="pdc-login-logo">
@@ -144,6 +160,7 @@ if (empty($_SESSION[$setupSessionKey])) {
             </div>
         </div>
     </div>
+    <script src="<?php echo APP_URL; ?>/assets/theme.js"></script>
     </body>
     </html>
     <?php
@@ -388,12 +405,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <script>
+        (function () {
+            var theme = null;
+            try { theme = localStorage.getItem('pdc.theme'); } catch (e) {}
+            if (theme !== 'light' && theme !== 'dark') {
+                theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        }());
+    </script>
     <title>Setup - Tests techniques</title>
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/bootstrap.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/css/all.min.css">
     <link rel="stylesheet" href="<?php echo APP_URL; ?>/assets/pdc.css">
 </head>
-<body>
+<body class="pdc-setup-page">
+<button type="button" class="btn pdc-theme-toggle pdc-theme-toggle-floating" data-pdc-theme-toggle aria-label="Activer le thème sombre" aria-pressed="false">
+    <i class="fa-solid fa-moon" aria-hidden="true"></i>
+    <span class="pdc-theme-toggle-label">Thème sombre</span>
+</button>
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 m-0"><i class="fa-solid fa-screwdriver-wrench"></i> Setup - Connexions</h1>
@@ -551,7 +583,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 <div class="fw-bold"><?php echo htmlspecialchars($step['label'], ENT_QUOTES, 'UTF-8'); ?></div>
                                 <small><?php echo htmlspecialchars($step['detail'], ENT_QUOTES, 'UTF-8'); ?></small>
                             </div>
-                            <span class="badge <?php echo ($step['status'] === 'ok') ? 'bg-success' : 'bg-danger'; ?> rounded-pill">
+                            <span class="badge <?php echo ($step['status'] === 'ok') ? 'text-bg-success' : 'text-bg-danger'; ?> rounded-pill">
                                 <?php echo ($step['status'] === 'ok') ? 'OK' : 'ERREUR'; ?>
                             </span>
                         </li>
@@ -567,7 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     </ul>
                     <div class="mt-3">
                         <label class="form-label"><strong>Resultat SQL (JSON)</strong></label>
-                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($dbResult['details'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                        <pre class="pdc-setup-result-json p-3 border rounded mb-0"><?php echo htmlspecialchars(json_encode($dbResult['details'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
                     </div>
                     <?php endif; ?>
                     <?php endif; ?>
@@ -602,7 +634,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 <div class="fw-bold"><?php echo htmlspecialchars($step['label'], ENT_QUOTES, 'UTF-8'); ?></div>
                                 <small><?php echo htmlspecialchars($step['detail'], ENT_QUOTES, 'UTF-8'); ?></small>
                             </div>
-                            <span class="badge <?php echo ($step['status'] === 'ok') ? 'bg-success' : 'bg-danger'; ?> rounded-pill">
+                            <span class="badge <?php echo ($step['status'] === 'ok') ? 'text-bg-success' : 'text-bg-danger'; ?> rounded-pill">
                                 <?php echo ($step['status'] === 'ok') ? 'OK' : 'ERREUR'; ?>
                             </span>
                         </li>
@@ -617,12 +649,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     </ul>
                     <div class="mt-3">
                         <label class="form-label"><strong>Resultat LDAP (JSON)</strong></label>
-                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                        <pre class="pdc-setup-result-json p-3 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
                     </div>
                     <?php if (!empty($ldapResult['service_account']) || true ): ?>
                     <div class="mt-3">
                         <label class="form-label"><strong>Attributs du compte de service (ldap_user_dn)</strong></label>
-                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['service_account'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                        <pre class="pdc-setup-result-json p-3 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapResult['service_account'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
                     </div>
                     <?php endif; ?>
                     <?php endif; ?>
@@ -659,7 +691,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     </ul>
                     <div class="mt-3">
                         <label class="form-label"><strong>Resultat de la recherche (JSON)</strong></label>
-                        <pre class="bg-light p-2 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapDnSearchResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
+                        <pre class="pdc-setup-result-json p-3 border rounded mb-0"><?php echo htmlspecialchars(json_encode($ldapDnSearchResult['results'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?></pre>
                     </div>
                     <?php endif; ?>
                     <?php endif; ?>
@@ -669,5 +701,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </div>
 </div>
 <script src="<?php echo APP_URL; ?>/assets/js/bootstrap.bundle.js"></script>
+<script src="<?php echo APP_URL; ?>/assets/theme.js"></script>
 </body>
 </html>
