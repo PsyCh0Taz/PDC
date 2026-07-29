@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <script>
+    window.__matrixErrors = [];
+    window.addEventListener("error", function (event) {
+      var detail = (event.message || "Erreur JavaScript") + " @ " + (event.lineno || "?") + ":" + (event.colno || "?");
+      window.__matrixErrors.push(detail);
+      document.documentElement.setAttribute("data-js-error", window.__matrixErrors.join(" | "));
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      var reason = event.reason && event.reason.message ? event.reason.message : String(event.reason || "Promesse rejetée");
+      document.documentElement.setAttribute("data-js-error", "Promesse rejetée : " + reason);
+    });
+  </script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Matrix — C²Factory</title>
+<style>
+:root{--bg:#f3f5f8;--panel:#fff;--panel2:#edf1f6;--text:#18202b;--muted:#667085;--line:#d6dce5;--accent:#246bfd;--accent2:#174ebc;--danger:#c62828;--ok:#16834b;--warn:#ad6800;--shadow:0 10px 30px #14213d18;--radius:14px}
+:root[data-theme="dark"]{--bg:#0d1117;--panel:#151b23;--panel2:#1d2631;--text:#edf2f7;--muted:#9ca9ba;--line:#313b49;--accent:#70a0ff;--accent2:#9bbcff;--danger:#ff6b6b;--ok:#57d68d;--warn:#ffbd59;--shadow:0 12px 32px #0008}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}.hidden{display:none!important}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 16px;background:#111820;color:#fff;box-shadow:0 3px 18px #0005}.brand{font-size:21px;font-weight:800;letter-spacing:.3px;white-space:nowrap}.brand sup{color:#ff3131}.docname{min-width:120px;max-width:280px;flex:1;border:1px solid #ffffff33;background:#ffffff12;color:#fff;border-radius:8px;padding:7px 9px}.top-actions{display:flex;align-items:center;gap:8px}.current-user{color:#dce6f4;white-space:nowrap}.save-state{font-size:12px;color:#aebdce}
+.iconbtn,.btn{border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:8px 11px}.topbar .iconbtn{background:#ffffff12;border-color:#ffffff33;color:#fff}.btn:hover,.iconbtn:hover{filter:brightness(1.06)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}.btn.ghost{background:transparent}.btn.small{padding:5px 8px;font-size:12px}.btn:disabled{opacity:.45;cursor:not-allowed}
+.layout{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:calc(100vh - 57px)}nav{position:sticky;top:57px;height:calc(100vh - 57px);padding:14px 10px;border-right:1px solid var(--line);background:var(--panel)}nav button{display:flex;width:100%;gap:9px;align-items:center;border:0;border-radius:9px;padding:10px;background:transparent;text-align:left;color:var(--muted)}nav button.active{background:var(--panel2);color:var(--text);font-weight:700}main{min-width:0;padding:20px}
+.view{display:none}.view.active{display:block}.viewhead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}.viewhead h1{font-size:24px;margin:0}.actions{display:flex;gap:8px;flex-wrap:wrap}.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 0 14px}.search{min-width:240px;flex:1;border:1px solid var(--line);border-radius:9px;background:var(--panel);padding:9px 11px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:15px}.stat strong{font-size:28px;display:block}.muted{color:var(--muted)}.card h2,.card h3{margin:0 0 10px}.span2{grid-column:span 2}.empty{padding:38px 16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:var(--radius)}
+.tablewrap{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}th{position:sticky;top:0;background:var(--panel2);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}tbody tr:hover{background:color-mix(in srgb,var(--panel2) 62%,transparent)}td .actions{flex-wrap:nowrap}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:800;background:var(--panel2)}.badge.ONLINE,.badge.OK{color:var(--ok)}.badge.OFFLINE,.badge.CRASHED,.badge.DRAFT{color:var(--danger)}.badge.PENDING{color:var(--warn)}.dot{width:8px;height:8px;border-radius:50%;background:currentColor;margin-right:5px}
+dialog{width:min(760px,calc(100% - 24px));max-height:92vh;border:1px solid var(--line);border-radius:16px;padding:0;background:var(--panel);color:var(--text);box-shadow:0 28px 90px #0008}dialog::backdrop{background:#07101bbb;backdrop-filter:blur(2px)}.modalhead,.modalfoot{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}.modalfoot{border-bottom:0;border-top:1px solid var(--line);justify-content:flex-end;gap:8px}.modalbody{padding:18px;overflow:auto;max-height:70vh}.modalhead h2{margin:0;font-size:19px}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;font-weight:700;color:var(--muted)}.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;background:var(--bg);padding:9px}.field textarea{min-height:80px;resize:vertical}.help{font-size:11px;color:var(--muted)}.errorbox{margin-bottom:12px;padding:10px;border:1px solid var(--danger);border-radius:9px;color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,transparent)}
+.detailcols{display:grid;grid-template-columns:1fr 1fr;gap:14px}.listitem{border:1px solid var(--line);border-radius:10px;padding:10px;margin:7px 0}.listitem .row{display:flex;justify-content:space-between;gap:8px}.separator{height:1px;background:var(--line);margin:14px 0}
+.refgrid{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:14px}.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:4px 7px;background:var(--panel2);border-radius:7px;font-size:12px}
+#mapSvg{display:block;width:100%;min-height:590px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}.map-table{margin-top:14px}.draftline{stroke:#f23b3b;stroke-width:3;stroke-dasharray:9 7;filter:drop-shadow(0 0 5px #f22)}.okline{stroke:#5f7f9f;stroke-width:2.3}.node rect{fill:var(--panel2);stroke:var(--line)}.node text{fill:var(--text);font-size:12px}.zone-label{font-weight:800;font-size:14px}.external-zone{stroke-dasharray:7 5;stroke-width:3}
+.toastbox{position:fixed;right:16px;bottom:16px;z-index:80;display:flex;flex-direction:column;gap:8px}.toast{max-width:360px;padding:11px 13px;background:#17212b;color:#fff;border-radius:10px;box-shadow:var(--shadow)}.toast.error{background:#8e2020}.toast.ok{background:#146b42}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,1fr)}.refgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.topbar{flex-wrap:wrap}.docname{order:3;max-width:none;width:100%}.layout{display:block}nav{position:sticky;top:97px;height:auto;z-index:15;display:flex;overflow:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px;background:var(--panel)}nav button{width:auto;white-space:nowrap}main{padding:12px}.grid,.refgrid,.detailcols,.formgrid{grid-template-columns:1fr}.span2{grid-column:auto}.field.full{grid-column:auto}.current-user,.save-state{display:none}.viewhead{align-items:flex-start}.tablewrap{font-size:12px}th,td{padding:8px}#mapSvg{min-height:480px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" aria-label="C carré Factory">C<sup>²</sup>Factory</div>
+  <input id="docName" class="docname" aria-label="Nom du document" value="Nouveau document">
+  <div class="top-actions">
+    <span id="saveState" class="save-state">Non sauvegardé</span>
+    <button id="userButton" class="iconbtn current-user" type="button">Utilisateur…</button>
+    <button id="themeButton" class="iconbtn" type="button" aria-label="Changer de thème">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav aria-label="Navigation principale">
+  <button data-view="dashboard" class="active">⌂ Tableau de bord</button>
+  <button data-view="equipments">▣ Équipements</button>
+  <button data-view="services">◆ Services</button>
+  <button data-view="flows">↔ Flux</button>
+  <button data-view="map">◎ Cartographie</button>
+  <button data-view="references">≡ Référentiels</button>
+  <button data-view="users">♙ Utilisateurs</button>
+  <button data-view="data">⇅ Données</button>
+</nav>
+<main>
+  <section id="view-dashboard" class="view active"></section>
+  <section id="view-equipments" class="view"></section>
+  <section id="view-services" class="view"></section>
+  <section id="view-flows" class="view"></section>
+  <section id="view-map" class="view"></section>
+  <section id="view-references" class="view"></section>
+  <section id="view-users" class="view"></section>
+  <section id="view-data" class="view"></section>
+</main>
+</div>
+<dialog id="modal">
+  <form id="modalForm" method="dialog">
+    <div class="modalhead"><h2 id="modalTitle"></h2><button class="iconbtn" value="cancel" aria-label="Fermer">✕</button></div>
+    <div id="modalBody" class="modalbody"></div>
+    <div id="modalFoot" class="modalfoot"><button class="btn" value="cancel">Annuler</button><button id="modalSubmit" class="btn primary" value="default">Enregistrer</button></div>
+  </form>
+</dialog>
+<input id="fileInput" class="hidden" type="file" accept=".json,application/json">
+<div id="toasts" class="toastbox" aria-live="polite"></div>
+<script>
+"use strict";
+const APP_VERSION="0.1.0",SCHEMA_VERSION=1,CATALOG_VERSION=1;
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const now=()=>new Date().toISOString();
+const uid=()=>crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:r&3|8).toString(16)});
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+const norm=v=>String(v??"").trim().toLocaleLowerCase("fr");
+const clone=v=>structuredClone?structuredClone(v):JSON.parse(JSON.stringify(v));
+const BUILTIN_TYPES=["PC","Serveur","Tablette","Switch","Routeur","Pare-Feux","Chiffreur"];
+const PORTS=[[20,"TCP","FTP données"],[21,"TCP","FTP contrôle"],[22,"TCP","SSH"],[23,"TCP","Telnet"],[25,"TCP","SMTP"],[53,"TCP","DNS"],[53,"UDP","DNS"],[67,"UDP","DHCP serveur"],[68,"UDP","DHCP client"],[69,"UDP","TFTP"],[80,"TCP","HTTP"],[110,"TCP","POP3"],[123,"UDP","NTP"],[143,"TCP","IMAP"],[161,"UDP","SNMP"],[162,"UDP","SNMP Trap"],[389,"TCP","LDAP"],[389,"UDP","LDAP"],[443,"TCP","HTTPS"],[445,"TCP","SMB"],[465,"TCP","SMTPS"],[636,"TCP","LDAPS"],[993,"TCP","IMAPS"],[995,"TCP","POP3S"],[1433,"TCP","Microsoft SQL Server"],[1434,"UDP","Microsoft SQL Server"],[1521,"TCP","Oracle"],[3306,"TCP","MySQL"],[3389,"TCP","RDP"],[3389,"UDP","RDP"],[5432,"TCP","PostgreSQL"],[5900,"TCP","VNC"],[5985,"TCP","WinRM HTTP"],[5986,"TCP","WinRM HTTPS"],[6379,"TCP","Redis"]];
+function builtins(){
+  const equipmentTypes=BUILTIN_TYPES.map(name=>({id:"builtin:type:"+norm(name),canonicalId:"type:"+norm(name),name,description:"",builtin:true}));
+  const protocols=["TCP","UDP"].map(name=>({id:"builtin:protocol:"+name.toLowerCase(),canonicalId:"protocol:"+name.toLowerCase(),name,description:"Protocole de transport",builtin:true}));
+  const pids=Object.fromEntries(protocols.map(p=>[p.name,p.id]));
+  const knownPorts=PORTS.map(([number,proto,name])=>({id:`builtin:port:${proto.toLowerCase()}:${number}`,canonicalId:`port:${proto.toLowerCase()}:${number}`,number,protocolId:pids[proto],name,aliases:[],description:"",builtin:true}));
+  return{equipmentTypes,protocols,knownPorts};
+}
+function newDocument(){
+  const b=builtins(),t=now();
+  return{schemaVersion:SCHEMA_VERSION,appVersion:APP_VERSION,catalogVersion:CATALOG_VERSION,document:{id:uid(),name:"Nouveau document",revision:0,parentHash:null,createdAt:t,updatedAt:t},users:[],zones:[],vlans:[],equipmentTypes:b.equipmentTypes,serviceTypes:[],protocols:b.protocols,knownPorts:b.knownPorts,equipments:[],services:[],flows:[],positions:{desktop:{},tablet:{},phone:{}}};
+}
+let state=newDocument(),currentView="dashboard",currentUserId=null,undoState=null,fileHandle=null,lastExternal=null,dirty=true,filterText="";
+const statusValues=["ONLINE","OFFLINE","PENDING","CRASHED"];
+function currentUser(){return state.users.find(x=>x.id===currentUserId)||null}
+function userPseudo(){return currentUser()?.pseudo||"non renseigné"}
+function entityMeta(item){const t=now();return Object.assign(item,{id:item.id||uid(),createdAt:item.createdAt||t,updatedAt:t})}
+function freshEntity(item){const copy=clone(item),t=now();copy.id=uid();copy.createdAt=t;copy.updatedAt=t;return copy}
+function transact(label,fn,{destructive=false}={}){
+  const before=clone(state);
+  try{fn();state.document.revision++;state.document.parentHash=hashText(JSON.stringify(before));state.document.updatedAt=now();dirty=true;if(destructive)undoState={label,state:before};scheduleRecovery();render();setSave("Non sauvegardé");toast(label,"ok")}
+  catch(e){state=before;toast(e.message||String(e),"error");throw e}
+}
+function hashText(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return("00000000"+(h>>>0).toString(16)).slice(-8)}
+function ensureUnique(list,name,except=null,scope=()=>true,msg="Ce nom existe déjà."){if(list.some(x=>x.id!==except&&scope(x)&&norm(x.name)===norm(name)))throw Error(msg)}
+function badge(v){return`<span class="badge ${esc(v)}"><span class="dot"></span>${esc(v)}</span>`}
+function ref(list,id){return list.find(x=>x.id===id)}
+function equip(id){return ref(state.equipments,id)}
+function service(id){return ref(state.services,id)}
+function zone(id){return ref(state.zones,id)}
+function protocol(id){return ref(state.protocols,id)}
+function interfacesOf(eid){return equip(eid)?.interfaces||[]}
+function serviceName(id){const s=service(id);return s?`${s.name} — ${equip(s.equipmentId)?.name||"?"}`:"À compléter"}
+function networkRefs(eid){
+  const out=[];for(const i of interfacesOf(eid)){out.push({kind:"interface",refId:i.id,label:`Interface · ${i.name}`});for(const ip of i.ips)out.push({kind:ip.family===4?"ipv4":"ipv6",refId:ip.id,label:`${ip.family===4?"IPv4":"IPv6"} · ${ip.address}`});for(const d of i.dns)out.push({kind:"dns",refId:d.id,label:`DNS · ${d.name}`})}return out
+}
+function listenerOptions(eid,listeners=[]){const selected=new Set(listeners.map(l=>`${l.kind}:${l.refId}`));return networkRefs(eid).map(r=>`<option value="${r.kind}:${r.refId}" ${selected.has(`${r.kind}:${r.refId}`)?"selected":""}>${esc(r.label)}</option>`).join("")}
+function serviceListenerOptions(serviceId,selected){const s=service(serviceId);return`<option value="">Non renseigné</option>`+(s?.listeners||[]).map(l=>{const r=networkRefs(s.equipmentId).find(x=>x.refId===l.refId);return`<option value="${l.id}" ${l.id===selected?"selected":""}>${esc(r?.label||"Point d'écoute")}</option>`}).join("")}
+function invalidateListeners(listenerIds,reason="point d'écoute supprimé"){
+  const ids=new Set(listenerIds);if(!ids.size)return;
+  state.flows.forEach(f=>f.endpoints.forEach(ep=>{if(ids.has(ep.listenerId)){ep.listenerId=null;f.anomalies=[...new Set([...(f.anomalies||[]),reason])];f.updatedAt=now()}}));
+}
+function removeNetworkReferences(refIds,reason="point d'écoute supprimé"){
+  const refs=new Set(refIds),removed=[];
+  state.services.forEach(s=>{const gone=s.listeners.filter(l=>refs.has(l.refId));removed.push(...gone.map(l=>l.id));if(gone.length){s.listeners=s.listeners.filter(l=>!refs.has(l.refId));s.updatedAt=now()}});
+  invalidateListeners(removed,reason);return removed;
+}
+function toast(message,type=""){const n=document.createElement("div");n.className="toast "+type;n.textContent=message;$("#toasts").append(n);setTimeout(()=>n.remove(),4200)}
+function setSave(v){$("#saveState").textContent=v}
+function fmtDate(v){try{return new Intl.DateTimeFormat("fr-FR",{dateStyle:"short",timeStyle:"short"}).format(new Date(v))}catch{return v}}
+function options(list,value,label=x=>x.name,empty="— Sélectionner —"){return`<option value="">${esc(empty)}</option>`+list.map(x=>`<option value="${x.id}" ${x.id===value?"selected":""}>${esc(label(x))}</option>`).join("")}
+function modal(title,body,onSubmit,{submit="Enregistrer",hideSubmit=false}={}){
+  const d=$("#modal"),f=$("#modalForm");$("#modalTitle").textContent=title;$("#modalBody").innerHTML=body;$("#modalSubmit").textContent=submit;$("#modalSubmit").classList.toggle("hidden",hideSubmit);
+  $$('[value="cancel"]',d).forEach(b=>b.classList.remove("hidden"));
+  f.onsubmit=e=>{e.preventDefault();if(e.submitter?.value==="cancel"){d.close();return}try{onSubmit?.(new FormData(f),f);d.close()}catch(err){showModalError(err.message||String(err))}};
+  d.showModal();setTimeout(()=>$(".modalbody input,.modalbody select,.modalbody button")?.focus(),20);
+}
+function showModalError(msg){let b=$(".errorbox",$("#modalBody"));if(!b){b=document.createElement("div");b.className="errorbox";$("#modalBody").prepend(b)}b.textContent=msg}
+function confirmAction(title,message,onYes){modal(title,`<p>${message}</p>`,()=>onYes(),{submit:"Confirmer"})}
+function historyEntry(oldStatus,newStatus,reason=""){return entityMeta({oldStatus:oldStatus||null,newStatus,pseudo:userPseudo(),reason,originDocumentUUID:state.document.id,occurredAt:now()})}
+function setView(name){currentView=name;$$("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));$$(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));renderView(name)}
+function render(){$("#docName").value=state.document.name;$("#userButton").textContent=currentUser()?`♙ ${currentUser().pseudo}`:"♙ Utilisateur…";renderView(currentView)}
+function renderView(v){({dashboard:renderDashboard,equipments:renderEquipments,services:renderServices,flows:renderFlows,map:renderMap,references:renderReferences,users:renderUsers,data:renderData}[v]||(()=>{}))()}
+function viewHeader(title,actions=""){return`<div class="viewhead"><h1>${title}</h1><div class="actions">${actions}</div></div>`}
+function matches(...values){if(!filterText)return true;const q=norm(filterText);return values.some(v=>norm(v).includes(q))}
+function renderDashboard(){
+  const root=$("#view-dashboard"),ok=state.flows.filter(f=>flowState(f)==="OK").length,draft=state.flows.length-ok;
+  root.innerHTML=viewHeader("Tableau de bord")+`<div class="grid">
+  <div class="card stat"><span class="muted">Équipements</span><strong>${state.equipments.length}</strong></div>
+  <div class="card stat"><span class="muted">Services</span><strong>${state.services.length}</strong></div>
+  <div class="card stat"><span class="muted">Flux OK</span><strong>${ok}</strong></div>
+  <div class="card stat"><span class="muted">Flux DRAFT</span><strong>${draft}</strong></div>
+  <div class="card span2"><h2>État du document</h2><p><b>${esc(state.document.name)}</b></p><p class="muted">UUID ${esc(state.document.id)}<br>Révision ${state.document.revision} · ${fmtDate(state.document.updatedAt)}</p>${undoState?`<button class="btn" data-action="undo">Annuler : ${esc(undoState.label)}</button>`:""}</div>
+  <div class="card span2"><h2>Alertes</h2>${draft?`<p>${draft} flux restent à compléter.</p>`:"<p>Aucun flux en brouillon.</p>"}${!state.zones.length?"<p>Créez une zone avant d'ajouter un équipement.</p>":""}${!state.users.length?"<p>Créez un utilisateur pour assurer la traçabilité.</p>":""}</div></div>`;
+  $('[data-action="undo"]',root)?.addEventListener("click",undoLast);
+}
+function toolbar(addLabel){return`<div class="toolbar"><input class="search" type="search" value="${esc(filterText)}" placeholder="Rechercher…" aria-label="Rechercher"><button class="btn primary" data-action="add">${addLabel}</button></div>`}
+function bindSearch(root){$(".search",root)?.addEventListener("input",e=>{filterText=e.target.value;renderView(currentView)})}
+function renderEquipments(){
+  const root=$("#view-equipments"),rows=state.equipments.filter(e=>matches(e.name,e.manufacturer,e.model,e.description,zone(e.zoneId)?.name,ref(state.equipmentTypes,e.typeId)?.name));
+  root.innerHTML=viewHeader("Équipements")+toolbar("+ Équipement")+(rows.length?`<div class="tablewrap"><table><thead><tr><th>Nom</th><th>Type</th><th>Zone</th><th>Statut</th><th>Interfaces</th><th>Services</th><th>Actions</th></tr></thead><tbody>${rows.map(e=>`<tr><td><b>${esc(e.name)}</b><br><span class="muted">${esc([e.manufacturer,e.model].filter(Boolean).join(" "))}</span></td><td>${esc(ref(state.equipmentTypes,e.typeId)?.name)}</td><td>${esc(zone(e.zoneId)?.name)}</td><td>${badge(e.status)}</td><td>${e.interfaces.length}</td><td>${state.services.filter(s=>s.equipmentId===e.id).length}</td><td><div class="actions"><button class="btn small" data-detail="${e.id}">Détails</button><button class="btn small" data-edit="${e.id}">Modifier</button><button class="btn small" data-copy="${e.id}">Dupliquer</button><button class="btn small danger" data-delete="${e.id}">Supprimer</button></div></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">Aucun équipement.</div>`);
+  bindSearch(root);$('[data-action="add"]',root).onclick=()=>openEquipmentForm();
+  $$("[data-edit]",root).forEach(b=>b.onclick=()=>openEquipmentForm(b.dataset.edit));$$("[data-detail]",root).forEach(b=>b.onclick=()=>openEquipmentDetail(b.dataset.detail));$$("[data-copy]",root).forEach(b=>b.onclick=()=>duplicateEquipment(b.dataset.copy));$$("[data-delete]",root).forEach(b=>b.onclick=()=>deleteEquipment(b.dataset.delete));
+}
+function openEquipmentForm(id=null){
+  if(!state.zones.length){toast("Créez d'abord une zone dans les référentiels.","error");setView("references");return}
+  const old=id?equip(id):null,e=old||{name:"",typeId:state.equipmentTypes[0]?.id,zoneId:state.zones[0]?.id,status:"PENDING",manufacturer:"",model:"",description:""};
+  modal(old?"Modifier l'équipement":"Nouvel équipement",`<div class="formgrid">
+  <div class="field"><label>Nom *</label><input name="name" required value="${esc(e.name)}"></div>
+  <div class="field"><label>Type *</label><select name="typeId" required>${options(state.equipmentTypes,e.typeId)}</select></div>
+  <div class="field"><label>Zone *</label><select name="zoneId" required>${options(state.zones,e.zoneId)}</select></div>
+  <div class="field"><label>Statut *</label><select name="status">${statusValues.map(x=>`<option ${x===e.status?"selected":""}>${x}</option>`).join("")}</select></div>
+  <div class="field"><label>Fabricant</label><input name="manufacturer" value="${esc(e.manufacturer)}"></div>
+  <div class="field"><label>Modèle</label><input name="model" value="${esc(e.model)}"></div>
+  <div class="field full"><label>Description</label><textarea name="description">${esc(e.description)}</textarea></div></div>`,fd=>{
+    const v=Object.fromEntries(fd);ensureUnique(state.equipments,v.name,id,()=>true,"Le nom de l'équipement existe déjà.");
+    if(old&&old.zoneId!==v.zoneId){const configured=old.interfaces.filter(i=>i.accessVlanId||i.nativeVlanId||(i.taggedVlanIds||[]).length);if(configured.length)throw Error(`Changement de zone bloqué : ${configured.length} interface(s) utilisent encore des VLAN de la zone actuelle.`);for(const i of old.interfaces)for(const ip of i.ips)if(state.equipments.some(eq=>eq.id!==old.id&&eq.zoneId===v.zoneId&&eq.interfaces.some(oi=>oi.ips.some(o=>norm(o.address)===norm(ip.address)&&(o.vlanId||null)===(ip.vlanId||null)))))throw Error(`L'adresse ${ip.address} existe déjà dans la zone de destination.`)}
+    transact(old?"Équipement modifié":"Équipement créé",()=>{
+      if(old){const prev=old.status;Object.assign(old,v,{updatedAt:now()});if(prev!==v.status)old.history.push(historyEntry(prev,v.status))}
+      else state.equipments.push(entityMeta({...v,interfaces:[],history:[historyEntry(null,v.status)]}))
+    });
+  });
+}
+function openEquipmentDetail(id){
+  const e=equip(id),svcs=state.services.filter(s=>s.equipmentId===id);
+  modal(e.name,`<div class="detailcols"><div><div class="actions"><button type="button" class="btn small primary" id="addInterface">+ Interface</button></div><h3>Interfaces</h3>${e.interfaces.length?e.interfaces.map(i=>`<div class="listitem"><div class="row"><b>${esc(i.name)}</b><span>${esc(i.mac||"Sans MAC")}</span></div><div class="muted">${i.ips.length} IP · ${i.dns.length} DNS · ${esc(i.vlanMode||"none")}</div><div class="actions"><button type="button" class="btn small" data-ifedit="${i.id}">Modifier</button><button type="button" class="btn small" data-ifcopy="${i.id}">Dupliquer</button><button type="button" class="btn small danger" data-ifdel="${i.id}">Supprimer</button></div></div>`).join(""):'<p class="muted">Aucune interface.</p>'}</div>
+  <div><div class="actions"><button type="button" class="btn small primary" id="addService">+ Service</button></div><h3>Services</h3>${svcs.length?svcs.map(s=>`<div class="listitem"><div class="row"><b>${esc(s.name)}</b>${badge(s.status)}</div><div class="muted">${esc(ref(state.serviceTypes,s.typeId)?.name||"Sans type")}</div></div>`).join(""):'<p class="muted">Aucun service.</p>'}</div></div>`,null,{hideSubmit:true});
+  $("#addInterface").onclick=()=>{$("#modal").close();openInterfaceForm(id)};$("#addService").onclick=()=>{$("#modal").close();openServiceForm(null,id)};
+  $$("[data-ifedit]").forEach(b=>b.onclick=()=>{$("#modal").close();openInterfaceForm(id,b.dataset.ifedit)});$$("[data-ifcopy]").forEach(b=>b.onclick=()=>{$("#modal").close();duplicateInterface(id,b.dataset.ifcopy)});$$("[data-ifdel]").forEach(b=>b.onclick=()=>{$("#modal").close();deleteInterface(id,b.dataset.ifdel)});
+}
+function parseIpLines(text,cfg){
+  return String(text).split(/\r?\n/).map(x=>x.trim()).filter(Boolean).map(line=>{
+    const parts=line.split("@").map(x=>x.trim()),cidr=parts[0],token=norm(parts[1]||""),slash=cidr.lastIndexOf("/"),raw=slash>0?cidr.slice(0,slash):cidr,prefix=slash>0?cidr.slice(slash+1):null,family=raw.includes(":")?6:4;
+    let address=raw;if(family===4){const oct=raw.split(".");if(oct.length!==4||oct.some(x=>!/^\d{1,3}$/.test(x)||+x>255))throw Error(`IPv4 invalide : ${raw}`);address=oct.map(Number).join(".")}else{try{address=new URL(`http://[${raw}]/`).hostname.slice(1,-1).toLowerCase()}catch{throw Error(`IPv6 invalide : ${raw}`)}}
+    const p=prefix==null||prefix===""?null:Number(prefix);if(p!=null&&(!Number.isInteger(p)||p<0||p>(family===4?32:128)))throw Error(`Préfixe invalide : ${line}`);
+    let vlanId=null,untagged=false;if(cfg.mode==="access")vlanId=cfg.primary||null;else if(cfg.mode==="trunk"){if(!token)throw Error(`Chaque IP trunk doit préciser « @ VLAN » ou « @ non taguée » : ${line}`);if(["non taguée","non taguee","untagged"].includes(token)){untagged=true;vlanId=cfg.primary||null}else{const v=cfg.zvlans.find(x=>(String(x.number)===token||norm(x.name)===token)&&cfg.tagged.includes(x.id));if(!v)throw Error(`VLAN tagué inconnu pour ${line}`);vlanId=v.id}}
+    return entityMeta({family,address,prefix:p,vlanId,untagged})
+  });
+}
+function openInterfaceForm(eid,iid=null){
+  const e=equip(eid),old=e.interfaces.find(x=>x.id===iid),i=old||{name:"",mac:"",description:"",vlanMode:"none",accessVlanId:"",taggedVlanIds:[],nativeVlanId:"",ips:[],dns:[]};
+  const zvlans=state.vlans.filter(v=>v.zoneId===e.zoneId);
+  modal(old?"Modifier l'interface":"Nouvelle interface",`<div class="formgrid">
+  <div class="field"><label>Nom *</label><input name="name" required value="${esc(i.name)}"></div>
+  <div class="field"><label>Adresse MAC</label><input name="mac" placeholder="AA:BB:CC:DD:EE:FF" value="${esc(i.mac)}"></div>
+  <div class="field"><label>Mode VLAN</label><select name="vlanMode" id="vlanMode"><option value="none">Aucun</option><option value="access" ${i.vlanMode==="access"?"selected":""}>Accès</option><option value="trunk" ${i.vlanMode==="trunk"?"selected":""}>Trunk</option></select></div>
+  <div class="field"><label>VLAN d'accès ou natif</label><select name="primaryVlanId">${options(zvlans,i.vlanMode==="access"?i.accessVlanId:i.nativeVlanId,x=>`${x.number} — ${x.name}`,"— Aucun —")}</select></div>
+  <div class="field full"><label>VLAN tagués en trunk</label><select name="taggedVlanIds" multiple size="4">${zvlans.map(v=>`<option value="${v.id}" ${(i.taggedVlanIds||[]).includes(v.id)?"selected":""}>${v.number} — ${esc(v.name)}</option>`).join("")}</select></div>
+  <div class="field full"><label>IPv4 / IPv6, une par ligne</label><textarea name="ips" placeholder="192.168.1.10/24&#10;10.0.0.5/24 @ 100&#10;2001:db8::10/64 @ non taguée">${esc(i.ips.map(x=>x.address+(x.prefix!=null?"/"+x.prefix:"")+(i.vlanMode==="trunk"?` @ ${x.untagged?"non taguée":state.vlans.find(v=>v.id===x.vlanId)?.number||""}`:"")).join("\n"))}</textarea><span class="help">En trunk, ajouter « @ numéro VLAN » ou « @ non taguée ».</span></div>
+  <div class="field full"><label>Noms DNS, un par ligne</label><textarea name="dns" placeholder="serveur.example.local">${esc(i.dns.map(x=>x.name).join("\n"))}</textarea></div>
+  <div class="field full"><label><input type="checkbox" name="allowDuplicateMac"> Autoriser exceptionnellement une MAC déjà utilisée</label></div>
+  ${old?'<div class="field full"><label><input type="checkbox" name="confirmListenerRemoval"> Je confirme le retrait des points d’écoute et le passage en DRAFT des flux concernés si je supprime une IP ou un DNS utilisé.</label></div>':""}
+  <div class="field full"><label>Description</label><textarea name="description">${esc(i.description)}</textarea></div></div>`,fd=>{
+    const v=Object.fromEntries(fd);ensureUnique(e.interfaces,v.name,iid,()=>true,"Ce nom d'interface existe déjà sur l'équipement.");
+    if(v.mac&&!/^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(v.mac))throw Error("Adresse MAC invalide.");
+    const mac=v.mac.toUpperCase().replace(/-/g,":"),duplicateMac=mac&&state.equipments.some(eq=>eq.interfaces.some(x=>x.id!==iid&&x.mac===mac));if(duplicateMac&&!fd.has("allowDuplicateMac"))throw Error("Cette adresse MAC est déjà utilisée. Cochez l'exception après vérification.");
+    const tagged=fd.getAll("taggedVlanIds"),primary=v.primaryVlanId||null;if(v.vlanMode==="access"&&!primary)throw Error("Un VLAN d'accès est obligatoire.");if(v.vlanMode==="trunk"&&!tagged.length)throw Error("Un trunk doit porter au moins un VLAN tagué.");if(v.vlanMode==="trunk"&&primary&&tagged.includes(primary))throw Error("Le VLAN natif ne peut pas être également tagué.");
+    const ips=parseIpLines(v.ips,{mode:v.vlanMode,primary,tagged,zvlans}),dnsNames=v.dns.split(/\r?\n/).map(x=>x.trim().replace(/\.$/,"")).filter(Boolean);if(new Set(dnsNames.map(norm)).size!==dnsNames.length)throw Error("Un nom DNS est présent plusieurs fois.");if(dnsNames.some(x=>!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i.test(x)))throw Error("Un nom DNS est invalide.");
+    for(const ip of ips)for(const eq of state.equipments)for(const other of eq.interfaces)if(other.id!==iid)for(const o of other.ips)if(norm(o.address)===norm(ip.address)&&eq.zoneId===e.zoneId&&(o.vlanId||null)===(ip.vlanId||null))throw Error(`L'adresse ${ip.address} existe déjà dans cette zone et ce VLAN.`);
+    const oldIps=new Map((old?.ips||[]).map(x=>[`${x.family}:${norm(x.address)}`,x])),oldDns=new Map((old?.dns||[]).map(x=>[norm(x.name),x]));
+    ips.forEach(ip=>{const previous=oldIps.get(`${ip.family}:${norm(ip.address)}`);if(previous)Object.assign(ip,{id:previous.id,createdAt:previous.createdAt,updatedAt:now()})});
+    const dns=dnsNames.map(name=>{const previous=oldDns.get(norm(name));return previous?{...clone(previous),name,updatedAt:now()}:entityMeta({name,ipIds:[]})});
+    const retained=new Set([...(ips.map(x=>x.id)),...(dns.map(x=>x.id))]),removedRefs=(old?[...old.ips,...old.dns]:[]).filter(x=>!retained.has(x.id)).map(x=>x.id);
+    const impactedListeners=state.services.flatMap(s=>s.listeners.filter(l=>removedRefs.includes(l.refId)).map(l=>l.id)),impactedFlows=state.flows.filter(f=>f.endpoints.some(ep=>impactedListeners.includes(ep.listenerId)));
+    if(impactedFlows.length&&!fd.has("confirmListenerRemoval"))throw Error(`${impactedFlows.length} flux utilisent une adresse ou un DNS retiré. Cochez la confirmation de suppression des points d'écoute.`);
+    transact(old?"Interface modifiée":"Interface créée",()=>{
+      const obj={name:v.name,mac,description:v.description,vlanMode:v.vlanMode,accessVlanId:v.vlanMode==="access"?primary:null,nativeVlanId:v.vlanMode==="trunk"?primary:null,taggedVlanIds:v.vlanMode==="trunk"?tagged:[],ips,dns};
+      if(old){Object.assign(old,obj,{updatedAt:now()});removeNetworkReferences(removedRefs)}else e.interfaces.push(entityMeta(obj));
+    });
+  });
+}
+function deleteInterface(eid,iid){
+  const e=equip(eid),i=e.interfaces.find(x=>x.id===iid),refs=[i.id,...i.ips.map(x=>x.id),...i.dns.map(x=>x.id)],listeners=state.services.flatMap(s=>s.listeners.filter(l=>refs.includes(l.refId)).map(l=>l.id)),flows=state.flows.filter(f=>f.endpoints.some(ep=>listeners.includes(ep.listenerId))),ok=flows.filter(f=>flowState(f)==="OK").length;
+  confirmAction("Supprimer l'interface",`Supprimer <b>${esc(i.name)}</b>, ${i.ips.length} adresse(s), ${i.dns.length} DNS et ${listeners.length} point(s) d'écoute ? ${flows.length} flux seront affectés (${ok} OK, ${flows.length-ok} DRAFT).`,()=>transact("Interface supprimée",()=>{removeNetworkReferences(refs);e.interfaces=e.interfaces.filter(x=>x.id!==iid)},{destructive:true}))
+}
+function duplicateInterface(eid,iid){const e=equip(eid),i=e.interfaces.find(x=>x.id===iid);transact("Interface dupliquée",()=>e.interfaces.push(freshEntity({...clone(i),name:nextName(i.name,e.interfaces),mac:"",ips:[],dns:[]})))}
+function renderServices(){
+  const root=$("#view-services"),rows=state.services.filter(s=>matches(s.name,s.version,s.description,equip(s.equipmentId)?.name,ref(state.serviceTypes,s.typeId)?.name));
+  root.innerHTML=viewHeader("Services")+toolbar("+ Service")+(rows.length?`<div class="tablewrap"><table><thead><tr><th>Nom</th><th>Équipement</th><th>Type</th><th>Version</th><th>Statut</th><th>Flux</th><th>Actions</th></tr></thead><tbody>${rows.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(equip(s.equipmentId)?.name)}</td><td>${esc(ref(state.serviceTypes,s.typeId)?.name)}</td><td>${esc(s.version)}</td><td>${badge(s.status)}</td><td>${state.flows.filter(f=>f.endpoints.some(ep=>ep.serviceId===s.id)).length}</td><td><div class="actions"><button class="btn small" data-edit="${s.id}">Modifier</button><button class="btn small" data-copy="${s.id}">Dupliquer</button><button class="btn small danger" data-delete="${s.id}">Supprimer</button></div></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">Aucun service.</div>');
+  bindSearch(root);$('[data-action="add"]',root).onclick=()=>openServiceForm();$$("[data-edit]",root).forEach(b=>b.onclick=()=>openServiceForm(b.dataset.edit));$$("[data-copy]",root).forEach(b=>b.onclick=()=>duplicateService(b.dataset.copy));$$("[data-delete]",root).forEach(b=>b.onclick=()=>deleteService(b.dataset.delete));
+}
+function openServiceForm(id=null,forcedEquipment=null){
+  if(!state.equipments.length){toast("Créez d'abord un équipement.","error");setView("equipments");return}
+  if(!state.serviceTypes.length){toast("Créez d'abord un type de service.","error");setView("references");return}
+  const old=id?service(id):null,s=old||{name:"",equipmentId:forcedEquipment||state.equipments[0].id,typeId:state.serviceTypes[0].id,version:"",status:"PENDING",description:"",listeners:[]},usedListenerIds=new Set(state.flows.flatMap(f=>f.endpoints.map(ep=>ep.listenerId).filter(Boolean))),usedListeners=(old?.listeners||[]).filter(l=>usedListenerIds.has(l.id));
+  modal(old?"Modifier le service":"Nouveau service",`<div class="formgrid">
+  <div class="field"><label>Nom *</label><input name="name" required value="${esc(s.name)}"></div>
+  <div class="field"><label>Équipement *</label><select name="equipmentId" ${old?"disabled":""}>${options(state.equipments,s.equipmentId)}</select>${old?`<input type="hidden" name="equipmentId" value="${s.equipmentId}">`:""}</div>
+  <div class="field"><label>Type *</label><select name="typeId">${options(state.serviceTypes,s.typeId)}</select></div>
+  <div class="field"><label>Version</label><input name="version" value="${esc(s.version)}"></div>
+  <div class="field"><label>Statut *</label><select name="status">${statusValues.map(x=>`<option ${x===s.status?"selected":""}>${x}</option>`).join("")}</select></div>
+  <div class="field full"><label>Points d'écoute</label><select id="serviceListeners" name="listeners" multiple size="6">${listenerOptions(s.equipmentId,s.listeners)}</select><span class="help">Ctrl+clic permet d'en sélectionner plusieurs.</span></div>
+  ${usedListeners.length?`<div class="field full"><label><input type="checkbox" name="confirmListenerRemoval"> Je confirme que le retrait d'un point utilisé fera passer les flux concernés en DRAFT (${usedListeners.length} point(s) actuellement utilisé(s)).</label></div>`:""}
+  <div class="field full"><label>Description</label><textarea name="description">${esc(s.description)}</textarea></div></div>`,fd=>{
+    const v=Object.fromEntries(fd);delete v.listeners;delete v.confirmListenerRemoval;ensureUnique(state.services,v.name,id,x=>x.equipmentId===v.equipmentId,"Ce nom de service existe déjà sur l'équipement.");
+    const previous=new Map((s.listeners||[]).map(l=>[`${l.kind}:${l.refId}`,l])),listeners=fd.getAll("listeners").map(key=>{const [kind,refId]=key.split(":");return previous.get(key)||entityMeta({kind,refId})});
+    const keptIds=new Set(listeners.map(l=>l.id)),removed=(old?.listeners||[]).filter(l=>!keptIds.has(l.id)).map(l=>l.id),affected=state.flows.filter(f=>f.endpoints.some(ep=>removed.includes(ep.listenerId)));if(affected.length&&!fd.has("confirmListenerRemoval"))throw Error(`${affected.length} flux utilisent un point d'écoute retiré. Cochez la confirmation.`);
+    transact(old?"Service modifié":"Service créé",()=>{if(old){const prev=old.status;Object.assign(old,v,{listeners,updatedAt:now()});invalidateListeners(removed);if(prev!==v.status)old.history.push(historyEntry(prev,v.status))}else state.services.push(entityMeta({...v,listeners,history:[historyEntry(null,v.status)]}))});
+  });
+  const eqSelect=$('select[name="equipmentId"]',$("#modalBody"));if(eqSelect&&!old)eqSelect.addEventListener("change",()=>{$("#serviceListeners").innerHTML=listenerOptions(eqSelect.value,[])});
+}
+function deleteService(id){const s=service(id),flows=state.flows.filter(f=>f.endpoints.some(ep=>ep.serviceId===id));confirmAction("Supprimer le service",`Supprimer <b>${esc(s.name)}</b> et ${flows.length} flux lié(s) ?`,()=>transact("Service supprimé",()=>{state.flows=state.flows.filter(f=>!f.endpoints.some(ep=>ep.serviceId===id));state.services=state.services.filter(x=>x.id!==id)},{destructive:true}))}
+function nextName(name,list,scope=()=>true){let n=2,c=`${name} (${n})`;while(list.some(x=>scope(x)&&norm(x.name)===norm(c)))c=`${name} (${++n})`;return c}
+function duplicateService(id){
+  const s=service(id);transact("Service dupliqué",()=>{
+    const listenerMap=new Map(),n=freshEntity({...clone(s),name:nextName(s.name,state.services,x=>x.equipmentId===s.equipmentId),history:[historyEntry(null,s.status)]});
+    n.listeners=s.listeners.map(l=>{const nl=freshEntity(l);listenerMap.set(l.id,nl.id);return nl});state.services.push(n);
+    const linked=state.flows.filter(f=>f.endpoints.some(ep=>ep.serviceId===id)).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||a.id.localeCompare(b.id));
+    for(const f of linked){
+      if(f.endpoints.length===2&&f.endpoints.every(ep=>ep.serviceId===id)){const nf=freshEntity(f);nf.endpoints.forEach(ep=>{ep.serviceId=n.id;ep.listenerId=listenerMap.get(ep.listenerId)||null});state.flows.push(nf)}
+      else{const ep=clone(f.endpoints.find(x=>x.serviceId===id));ep.serviceId=n.id;ep.listenerId=listenerMap.get(ep.listenerId)||null;addDraftOrGroup({endpoints:[ep],protocolId:f.protocolId,direction:null,description:f.description,anomalies:["service distant à compléter"]},f)}
+    }
+  })
+}
+function duplicateEquipment(id){
+  const e=equip(id);transact("Équipement dupliqué",()=>{
+    const entityMap=new Map(),listenerMap=new Map(),ne=freshEntity({...clone(e),name:nextName(e.name,state.equipments),interfaces:[],history:[historyEntry(null,e.status)]});
+    for(const i of e.interfaces){const ni=freshEntity({...clone(i),mac:"",ips:[],dns:[]});entityMap.set(i.id,ni.id);ne.interfaces.push(ni)}state.equipments.push(ne);
+    const oldSvcs=state.services.filter(s=>s.equipmentId===id);
+    for(const s of oldSvcs){const ns=freshEntity({...clone(s),equipmentId:ne.id,history:[historyEntry(null,s.status)],listeners:[]});for(const l of s.listeners.filter(l=>entityMap.has(l.refId))){const nl=freshEntity({...clone(l),refId:entityMap.get(l.refId)});listenerMap.set(l.id,nl.id);ns.listeners.push(nl)}entityMap.set(s.id,ns.id);state.services.push(ns)}
+    const linked=state.flows.filter(f=>f.endpoints.some(ep=>entityMap.has(ep.serviceId))).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||a.id.localeCompare(b.id));
+    for(const f of linked){const copied=f.endpoints.filter(ep=>entityMap.has(ep.serviceId));if(copied.length===2){const nf=freshEntity(f),lost=[];nf.endpoints.forEach(ep=>{const oldListener=ep.listenerId;ep.serviceId=entityMap.get(ep.serviceId);ep.listenerId=listenerMap.get(oldListener)||null;if(oldListener&&!ep.listenerId)lost.push(oldListener)});if(lost.length)nf.anomalies=[...new Set([...(nf.anomalies||[]),"point d'écoute supprimé"])];state.flows.push(nf)}else if(copied.length===1){const ep=clone(copied[0]),lost=ep.listenerId&&!listenerMap.has(ep.listenerId);ep.serviceId=entityMap.get(ep.serviceId);ep.listenerId=listenerMap.get(ep.listenerId)||null;addDraftOrGroup({endpoints:[ep],protocolId:f.protocolId,direction:null,description:f.description,anomalies:["service distant à compléter",...(lost?["point d'écoute supprimé"]:[])]},f)}}
+  })
+}
+function deleteEquipment(id){const e=equip(id),sids=new Set(state.services.filter(s=>s.equipmentId===id).map(s=>s.id)),flows=state.flows.filter(f=>f.endpoints.some(ep=>sids.has(ep.serviceId)));confirmAction("Supprimer l'équipement",`Supprimer <b>${esc(e.name)}</b>, ses ${e.interfaces.length} interface(s), ${sids.size} service(s) et ${flows.length} flux ?`,()=>transact("Équipement supprimé",()=>{state.flows=state.flows.filter(f=>!f.endpoints.some(ep=>sids.has(ep.serviceId)));state.services=state.services.filter(s=>!sids.has(s.id));state.equipments=state.equipments.filter(x=>x.id!==id)},{destructive:true}))}
+function parsePorts(text){
+  const rawItems=[];for(const raw of String(text).split(",")){const p=raw.trim();if(!p)continue;const pieces=p.split("|");if(pieces.length>2)throw Error(`Usage invalide : ${p}`);const range=pieces[0].trim(),usage=(pieces[1]||"").trim(),m=range.match(/^(\d+)(?:-(\d+))?$/);if(!m)throw Error(`Port invalide : ${p}`);const a=+m[1],b=+(m[2]||m[1]);if(a<1||b>65535||a>b)throw Error(`Plage invalide : ${range}`);rawItems.push({start:a,end:b,usage})}
+  const slots=new Array(65536);for(const item of rawItems)for(let port=item.start;port<=item.end;port++){if(slots[port]!==undefined&&slots[port]!==item.usage)throw Error(`Le port ${port} se chevauche avec des usages différents.`);slots[port]=item.usage}
+  const out=[];for(let port=1;port<=65535;){if(slots[port]===undefined){port++;continue}const usage=slots[port],start=port;while(port<65535&&slots[port+1]===usage)port++;out.push({start,end:port,usage});port++}return out;
+}
+function portsText(items=[]){return items.map(x=>x.start+(x.end!==x.start?`-${x.end}`:"")+(x.usage?` | ${x.usage}`:"")).join(", ")}
+function normalizedPorts(items=[]){return items.map(x=>`${x.start}-${x.end}`).sort().join(",")}
+function knownPortOptions(protocolId){return state.knownPorts.filter(p=>p.protocolId===protocolId).map(p=>`<option value="${p.number} | ${esc(p.name)}">${esc([p.name,...(p.aliases||[])].join(" · "))}</option>`).join("")}
+function inverseDirection(d){return d==="a-b"?"b-a":d==="b-a"?"a-b":d}
+function flowKey(f){
+  const eps=f.endpoints.map(ep=>`${ep.serviceId||""}/${ep.listenerId||""}/${normalizedPorts(ep.ports)}`);
+  const direct=`${eps.join(">")}|${f.protocolId}|${f.direction||""}`,rev=`${[...eps].reverse().join(">")}|${f.protocolId}|${inverseDirection(f.direction)||""}`;
+  return direct<rev?direct:rev;
+}
+function flowState(f){return f.endpoints.length===2&&f.endpoints.every(x=>x.serviceId)&&f.direction&&f.protocolId&&!(f.anomalies||[]).length?"OK":"DRAFT"}
+function addDraftOrGroup(draft,origin){
+  const context={originFlowId:origin.id,description:origin.description,endpoints:clone(origin.endpoints),usages:origin.endpoints.map(ep=>ep.ports.map(p=>p.usage))},key=flowKey(draft),existing=state.flows.find(x=>flowState(x)==="DRAFT"&&flowKey(x)===key);
+  if(existing){existing.groupContexts=existing.groupContexts||[];existing.groupContexts.push(context);existing.anomalies=[...new Set([...(existing.anomalies||[]),"variantes regroupées à résoudre"])];existing.updatedAt=now()}else{draft.groupContexts=[context];state.flows.push(entityMeta(draft))}
+}
+function renderFlows(){
+  const root=$("#view-flows"),rows=state.flows.filter(f=>matches(f.description,protocol(f.protocolId)?.name,...f.endpoints.map(ep=>serviceName(ep.serviceId)),...f.endpoints.flatMap(ep=>ep.ports.map(p=>`${p.start} ${p.end} ${p.usage}`))));
+  root.innerHTML=viewHeader("Flux")+toolbar("+ Flux")+(rows.length?`<div class="tablewrap"><table><thead><tr><th>Service local</th><th>Sens</th><th>Service distant</th><th>Protocole</th><th>Ports local / distant</th><th>État</th><th>Actions</th></tr></thead><tbody>${rows.map(f=>`<tr><td>${esc(serviceName(f.endpoints[0]?.serviceId))}</td><td>${f.direction==="a-b"?"→":f.direction==="b-a"?"←":f.direction==="both"?"↔":"—"}</td><td>${esc(serviceName(f.endpoints[1]?.serviceId))}</td><td>${esc(protocol(f.protocolId)?.name)}</td><td>${esc(portsText(f.endpoints[0]?.ports))}<br>${esc(portsText(f.endpoints[1]?.ports))}</td><td>${badge(flowState(f))}</td><td><div class="actions"><button class="btn small" data-edit="${f.id}">Modifier</button><button class="btn small" data-copy="${f.id}">Dupliquer</button><button class="btn small danger" data-delete="${f.id}">Supprimer</button></div></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">Aucun flux.</div>');
+  bindSearch(root);$('[data-action="add"]',root).onclick=()=>openFlowForm();$$("[data-edit]",root).forEach(b=>b.onclick=()=>openFlowForm(b.dataset.edit));$$("[data-copy]",root).forEach(b=>b.onclick=()=>openFlowForm(null,b.dataset.copy));$$("[data-delete]",root).forEach(b=>b.onclick=()=>deleteFlow(b.dataset.delete));
+}
+function openFlowForm(id=null,copyId=null){
+  if(!state.services.length){toast("Créez d'abord un service.","error");setView("services");return}
+  const old=id?ref(state.flows,id):null,source=copyId?ref(state.flows,copyId):null,f=clone(old||source||{endpoints:[{serviceId:state.services[0].id,listenerId:null,ports:[]},{serviceId:"",listenerId:null,ports:[]}],protocolId:state.protocols[0].id,direction:null,description:"",anomalies:[]});
+  while(f.endpoints.length<2)f.endpoints.push({serviceId:"",listenerId:null,ports:[]});
+  modal(old?"Modifier le flux":source?"Dupliquer le flux":"Nouveau flux",`<div class="formgrid">
+  <div class="field"><label>Service local *</label><select name="serviceA">${options(state.services,f.endpoints[0].serviceId,x=>serviceName(x.id))}</select></div>
+  <div class="field"><label>Point d'écoute local</label><select name="listenerA">${serviceListenerOptions(f.endpoints[0].serviceId,f.endpoints[0].listenerId)}</select></div>
+  <div class="field"><label>Ports locaux</label><input name="portsA" list="knownPortsList" value="${esc(portsText(f.endpoints[0].ports))}" placeholder="80 | Web, 8000-8010 | App"><span class="help">Format : port ou plage | usage, séparés par des virgules.</span></div>
+  <div class="field"><label>Service distant</label><select name="serviceB">${options(state.services,f.endpoints[1].serviceId,x=>serviceName(x.id),"À compléter")}</select></div>
+  <div class="field"><label>Point d'écoute distant</label><select name="listenerB">${serviceListenerOptions(f.endpoints[1].serviceId,f.endpoints[1].listenerId)}</select></div>
+  <div class="field"><label>Ports distants</label><input name="portsB" list="knownPortsList" value="${esc(portsText(f.endpoints[1].ports))}"></div>
+  <div class="field"><label>Protocole *</label><select name="protocolId">${options(state.protocols,f.protocolId)}</select></div>
+  <div class="field"><label>Sens</label><select name="direction"><option value="">Non renseigné</option><option value="a-b" ${f.direction==="a-b"?"selected":""}>Local → Distant</option><option value="b-a" ${f.direction==="b-a"?"selected":""}>Local ← Distant</option><option value="both" ${f.direction==="both"?"selected":""}>Local ↔ Distant</option></select></div>
+  <datalist id="knownPortsList">${knownPortOptions(f.protocolId)}</datalist>
+  ${old&&(old.anomalies||[]).includes("point d'écoute supprimé")?'<div class="field full"><label><input type="checkbox" name="confirmNoListener"> Confirmer explicitement « point d’écoute non renseigné » si aucun nouveau point n’est sélectionné.</label></div>':""}
+  ${old&&(old.groupContexts||[]).length?'<div class="field full"><label><input type="checkbox" name="resolveVariants"> J’ai choisi ou fusionné les variantes regroupées de description et d’usages.</label></div>':""}
+  <div class="field full"><label>Description</label><textarea name="description">${esc(f.description)}</textarea></div></div>`,fd=>{
+    const v=Object.fromEntries(fd);if(!v.serviceA||!v.protocolId)throw Error("Un service et un protocole sont obligatoires.");
+    const nf={endpoints:[{serviceId:v.serviceA,listenerId:v.listenerA||null,ports:parsePorts(v.portsA)}],protocolId:v.protocolId,direction:v.direction||null,description:v.description,anomalies:[]};if(v.serviceB)nf.endpoints.push({serviceId:v.serviceB,listenerId:v.listenerB||null,ports:parsePorts(v.portsB)});
+    if(old&&(old.anomalies||[]).includes("point d'écoute supprimé")&&nf.endpoints.some(ep=>!ep.listenerId)&&!fd.has("confirmNoListener"))throw Error("Sélectionnez un nouveau point d'écoute ou confirmez explicitement « non renseigné ».");
+    if(old&&(old.groupContexts||[]).length&&!fd.has("resolveVariants"))throw Error("Confirmez la résolution des variantes regroupées.");
+    if(nf.endpoints.length===2&&nf.endpoints[0].serviceId===nf.endpoints[1].serviceId&&nf.endpoints[0].listenerId===nf.endpoints[1].listenerId&&normalizedPorts(nf.endpoints[0].ports)===normalizedPorts(nf.endpoints[1].ports))throw Error("Les deux extrémités d'un auto-flux ne peuvent pas être identiques.");
+    const key=flowKey(nf);if(state.flows.some(x=>x.id!==id&&flowKey(x)===key))throw Error("Un flux ayant la même clé technique existe déjà.");if(source&&flowKey(source)===key)throw Error("Modifiez au moins un champ de la clé technique.");
+    transact(old?"Flux modifié":"Flux créé",()=>{if(old)Object.assign(old,nf,{groupContexts:[],updatedAt:now()});else state.flows.push(entityMeta(nf))});
+  });
+  const sa=$('select[name="serviceA"]',$("#modalBody")),sb=$('select[name="serviceB"]',$("#modalBody")),proto=$('select[name="protocolId"]',$("#modalBody"));sa.onchange=()=>{$('select[name="listenerA"]').innerHTML=serviceListenerOptions(sa.value,null)};sb.onchange=()=>{$('select[name="listenerB"]').innerHTML=serviceListenerOptions(sb.value,null)};proto.onchange=()=>{$("#knownPortsList").innerHTML=knownPortOptions(proto.value)};
+}
+function deleteFlow(id){confirmAction("Supprimer le flux","Supprimer ce flux ?",()=>transact("Flux supprimé",()=>state.flows=state.flows.filter(x=>x.id!==id),{destructive:true}))}
+</script>
+<script>
+function renderReferences(){
+  const root=$("#view-references");root.innerHTML=viewHeader("Référentiels")+`<div class="refgrid">
+  ${refCard("Zones","zone",state.zones,x=>`${x.external?"Externe · ":""}${x.description||""}`)}
+  ${refCard("VLAN","vlan",state.vlans,x=>`${x.number} · ${zone(x.zoneId)?.name||"?"}`)}
+  ${refCard("Types d'équipements","equipmentType",state.equipmentTypes,x=>x.description)}
+  ${refCard("Types de services","serviceType",state.serviceTypes,x=>x.description)}
+  ${refCard("Protocoles","protocol",state.protocols,x=>x.description)}
+  ${refCard("Ports connus","knownPort",state.knownPorts,x=>`${protocol(x.protocolId)?.name||"?"}/${x.number}`)}
+  </div>`;$$("[data-refadd]",root).forEach(b=>b.onclick=()=>openRefForm(b.dataset.refadd));$$("[data-refedit]",root).forEach(b=>b.onclick=()=>openRefForm(b.dataset.kind,b.dataset.refedit));$$("[data-refdel]",root).forEach(b=>b.onclick=()=>deleteRef(b.dataset.kind,b.dataset.refdel));
+}
+function refCard(title,kind,list,sub){return`<div class="card"><div class="viewhead"><h2>${title}</h2><button class="btn small primary" data-refadd="${kind}">+</button></div>${list.length?list.map(x=>`<div class="listitem"><div class="row"><b>${esc(x.name)}</b>${x.builtin?'<span class="badge">Intégré</span>':`<span><button class="btn small" data-kind="${kind}" data-refedit="${x.id}">✎</button> <button class="btn small danger" data-kind="${kind}" data-refdel="${x.id}">×</button></span>`}</div><div class="muted">${esc(sub(x)||"")}</div></div>`).join(""):'<p class="muted">Aucune valeur.</p>'}</div>`}
+function listForKind(k){return k==="zone"?state.zones:k==="vlan"?state.vlans:k==="equipmentType"?state.equipmentTypes:k==="serviceType"?state.serviceTypes:k==="protocol"?state.protocols:state.knownPorts}
+function openRefForm(kind,id=null){
+  const list=listForKind(kind),old=ref(list,id)||{},name=old.name||"";
+  let fields=`<div class="field"><label>Nom *</label><input name="name" required value="${esc(name)}"></div>`;
+  if(kind==="zone")fields+=`<div class="field"><label>Couleur</label><input name="color" type="color" value="${esc(old.color||"#4f7cff")}"></div><div class="field"><label><input name="external" type="checkbox" ${old.external?"checked":""}> Zone externe</label></div>`;
+  if(kind==="vlan")fields=`<div class="field"><label>Nom *</label><input name="name" required value="${esc(name)}"></div><div class="field"><label>Identifiant *</label><input name="number" type="number" min="1" max="4094" required value="${esc(old.number||"")}"></div><div class="field"><label>Zone *</label><select name="zoneId">${options(state.zones,old.zoneId)}</select></div>`;
+  if(kind==="knownPort")fields=`<div class="field"><label>Service standard *</label><input name="name" required value="${esc(name)}"></div><div class="field"><label>Port *</label><input name="number" type="number" min="1" max="65535" required value="${esc(old.number||"")}"></div><div class="field"><label>Protocole *</label><select name="protocolId">${options(state.protocols,old.protocolId)}</select></div><div class="field"><label>Alias, séparés par des virgules</label><input name="aliases" value="${esc((old.aliases||[]).join(", "))}"></div>`;
+  fields+=`<div class="field full"><label>Description</label><textarea name="description">${esc(old.description||"")}</textarea></div>`;
+  modal(id?"Modifier la valeur":"Ajouter une valeur",`<div class="formgrid">${fields}</div>`,fd=>{const v=Object.fromEntries(fd);v.external=fd.has("external");if(kind==="vlan"){v.number=+v.number;if(!v.zoneId)throw Error("La zone est obligatoire.");if(id&&old.zoneId!==v.zoneId&&refUsed("vlan",id))throw Error("Le changement de zone est interdit tant que ce VLAN est utilisé par une interface.");if(state.vlans.some(x=>x.id!==id&&x.zoneId===v.zoneId&&(x.number===v.number||norm(x.name)===norm(v.name))))throw Error("Le nom ou l'identifiant VLAN existe déjà dans cette zone.")}else if(kind==="knownPort"){v.number=+v.number;v.aliases=v.aliases.split(",").map(x=>x.trim()).filter(Boolean);if(state.knownPorts.some(x=>x.id!==id&&x.protocolId===v.protocolId&&x.number===v.number))throw Error("Cette correspondance protocole-port existe déjà.")}else ensureUnique(list,v.name,id,()=>true,"Ce nom existe déjà.");transact(id?"Référentiel modifié":"Référentiel enrichi",()=>{if(id)Object.assign(old,v,{updatedAt:now()});else list.push(entityMeta({...v,builtin:false}))})});
+}
+function refUsed(kind,id){
+  if(kind==="zone")return state.equipments.some(x=>x.zoneId===id)||state.vlans.some(x=>x.zoneId===id);
+  if(kind==="vlan")return state.equipments.some(e=>e.interfaces.some(i=>i.accessVlanId===id||i.nativeVlanId===id||(i.taggedVlanIds||[]).includes(id)));
+  if(kind==="equipmentType")return state.equipments.some(x=>x.typeId===id);
+  if(kind==="serviceType")return state.services.some(x=>x.typeId===id);
+  if(kind==="protocol")return state.flows.some(x=>x.protocolId===id)||state.knownPorts.some(x=>x.protocolId===id);
+  return false;
+}
+function deleteRef(kind,id){const list=listForKind(kind),x=ref(list,id);if(x.builtin)return;if(refUsed(kind,id)){toast("Cette valeur est encore utilisée.","error");return}confirmAction("Supprimer la valeur",`Supprimer <b>${esc(x.name)}</b> ?`,()=>transact("Valeur supprimée",()=>{const i=list.findIndex(y=>y.id===id);list.splice(i,1)},{destructive:true}))}
+function renderUsers(){
+  const root=$("#view-users");root.innerHTML=viewHeader("Utilisateurs",'<button class="btn primary" data-action="add">+ Utilisateur</button>')+(state.users.length?`<div class="tablewrap"><table><thead><tr><th>Pseudo</th><th>Libellé</th><th>Utilisateur courant</th><th>Actions</th></tr></thead><tbody>${state.users.map(u=>`<tr><td><b>${esc(u.pseudo)}</b></td><td>${esc(u.label)}</td><td>${u.id===currentUserId?badge("OK"):""}</td><td><div class="actions"><button class="btn small" data-select="${u.id}">Utiliser</button><button class="btn small" data-edit="${u.id}">Modifier</button><button class="btn small danger" data-delete="${u.id}">Supprimer</button></div></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">Aucun utilisateur.</div>');
+  $('[data-action="add"]',root).onclick=()=>openUserForm();$$("[data-select]",root).forEach(b=>b.onclick=()=>selectUser(b.dataset.select));$$("[data-edit]",root).forEach(b=>b.onclick=()=>openUserForm(b.dataset.edit));$$("[data-delete]",root).forEach(b=>b.onclick=()=>deleteUser(b.dataset.delete));
+}
+function openUserForm(id=null,mandatory=false){const old=ref(state.users,id)||{pseudo:"",label:""};modal(id?"Modifier l'utilisateur":"Nouvel utilisateur",`<div class="formgrid"><div class="field"><label>Pseudo *</label><input name="pseudo" required placeholder="DOMAINE\\utilisateur" value="${esc(old.pseudo)}"></div><div class="field"><label>Libellé *</label><input name="label" required value="${esc(old.label)}"></div></div>`,fd=>{const v=Object.fromEntries(fd);if(state.users.some(x=>x.id!==id&&norm(x.pseudo)===norm(v.pseudo)))throw Error("Ce pseudo existe déjà.");const renamedCurrent=id===currentUserId&&norm(old.pseudo)!==norm(v.pseudo);transact(id?"Utilisateur modifié":"Utilisateur créé",()=>{if(id){Object.assign(old,v,{updatedAt:now()});if(renamedCurrent)currentUserId=null}else{const u=entityMeta(v);state.users.push(u);currentUserId=u.id}});savePrefs();if(renamedCurrent)setTimeout(ensureUser,0)},{submit:"Valider"});if(mandatory)$$('[value="cancel"]',$("#modal")).forEach(b=>b.classList.add("hidden"))}
+function selectUser(id){currentUserId=id;savePrefs();render();toast("Utilisateur courant modifié.","ok")}
+function deleteUser(id){const u=ref(state.users,id);confirmAction("Supprimer l'utilisateur",`Supprimer <b>${esc(u.pseudo)}</b> ? Les historiques conserveront ce pseudo.`,()=>{transact("Utilisateur supprimé",()=>{state.users=state.users.filter(x=>x.id!==id);if(currentUserId===id)currentUserId=null},{destructive:true});savePrefs();if(!currentUser())setTimeout(ensureUser,0)})}
+function renderMap(){
+  const root=$("#view-map"),zones=state.zones.map((z,zi)=>{const eqs=state.equipments.filter(e=>e.zoneId===z.id);return{z,eqs,x:30+(zi%2)*540,y:30+Math.floor(zi/2)*320,w:500,h:280}}),nodes=new Map();
+  let svg=`<defs><marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><path d="M0,0 L9,3.5 L0,7 z" fill="#6e8aaa"/></marker><filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  zones.forEach(({z,eqs,x,y,w,h})=>{svg+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${z.external?48:14}" fill="${esc(z.color||"#4f7cff")}18" stroke="${esc(z.color||"#4f7cff")}" class="${z.external?"external-zone":""}"/><text x="${x+14}" y="${y+23}" class="zone-label">${esc(z.name)}${z.external?" · Externe":""}</text>`;eqs.forEach((e,ei)=>{const ex=x+20+(ei%3)*155,ey=y+44+Math.floor(ei/3)*103;svg+=`<g class="node" tabindex="0" role="button" aria-label="Équipement ${esc(e.name)}"><rect x="${ex}" y="${ey}" width="140" height="88" rx="10"/><text x="${ex+9}" y="${ey+18}" font-weight="700">${esc(e.name.slice(0,19))}</text>`;state.services.filter(s=>s.equipmentId===e.id).slice(0,4).forEach((s,si)=>{const sy=ey+34+si*13;nodes.set(s.id,{x:ex+70,y:sy});svg+=`<text x="${ex+10}" y="${sy}" aria-label="Service ${esc(s.name)}">◆ ${esc(s.name.slice(0,16))}</text>`});svg+="</g>"})});
+  let lines="";state.flows.forEach(f=>{const a=nodes.get(f.endpoints[0]?.serviceId),b=nodes.get(f.endpoints[1]?.serviceId);if(!a)return;const target=b||{x:a.x+105,y:a.y+55},draft=flowState(f)==="DRAFT",both=f.direction==="both";lines+=`<line x1="${a.x}" y1="${a.y}" x2="${target.x}" y2="${target.y}" class="${draft?"draftline":"okline"}" ${!draft&&f.direction?'marker-end="url(#arrow)"':""} ${both?'marker-start="url(#arrow)"':""}><title>${esc(serviceName(f.endpoints[0]?.serviceId))} — ${esc(serviceName(f.endpoints[1]?.serviceId))} — ${flowState(f)}</title></line>`;if(!b)lines+=`<text x="${target.x+5}" y="${target.y}" fill="#f23b3b">À compléter</text>`});
+  root.innerHTML=viewHeader("Cartographie",'<button class="btn" id="printMap">Imprimer</button><button class="btn" id="svgExport">Exporter SVG</button>')+`<svg id="mapSvg" viewBox="0 0 1100 ${Math.max(650,Math.ceil(zones.length/2)*330)}" role="img" aria-label="Cartographie des équipements et flux">${lines+svg}</svg><div class="map-table"><h2>Vue tabulaire accessible</h2>${state.flows.length?`<div class="tablewrap"><table><thead><tr><th>Source</th><th>Destination</th><th>Protocole</th><th>État</th></tr></thead><tbody>${state.flows.map(f=>`<tr><td>${esc(serviceName(f.endpoints[0]?.serviceId))}</td><td>${esc(serviceName(f.endpoints[1]?.serviceId))}</td><td>${esc(protocol(f.protocolId)?.name)}</td><td>${flowState(f)}</td></tr>`).join("")}</tbody></table></div>`:'<p class="muted">Aucun flux.</p>'}</div>`;
+  $("#printMap").onclick=()=>window.print();$("#svgExport").onclick=exportSvg;
+}
+function exportSvg(){const svg=$("#mapSvg").cloneNode(true);svg.setAttribute("xmlns","http://www.w3.org/2000/svg");download(new Blob([new XMLSerializer().serializeToString(svg)],{type:"image/svg+xml"}),`${safeName(state.document.name)}-cartographie.svg`)}
+function renderData(){
+  const root=$("#view-data");root.innerHTML=viewHeader("Données")+`<div class="grid"><div class="card span2"><h2>Import et export totaux</h2><p>L'intégralité du document est toujours incluse.</p><div class="actions"><button class="btn primary" id="exportJson">Exporter JSON</button><button class="btn" id="importJson">Importer JSON</button>${"showSaveFilePicker"in window?'<button class="btn" id="saveDirect">Enregistrer directement</button>':""}</div></div><div class="card"><h2>Copie indépendante</h2><p>Renouvelle tous les UUID métier.</p><button class="btn" id="independentCopy">Créer</button></div><div class="card"><h2>Réinitialisation</h2><p>Crée un nouveau document après export de sécurité.</p><button class="btn danger" id="resetApp">Réinitialiser</button></div></div>`;
+  $("#exportJson").onclick=exportJson;$("#importJson").onclick=()=>$("#fileInput").click();$("#saveDirect")?.addEventListener("click",saveDirect);$("#independentCopy").onclick=createIndependentCopy;$("#resetApp").onclick=resetApplication;
+}
+function safeName(v){return(v||"matrix").replace(/[^\p{L}\p{N}_.-]+/gu,"-")}
+function exportPayload(){return clone(state)}
+function download(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+function exportJson(){download(new Blob([JSON.stringify(exportPayload(),null,2)],{type:"application/json"}),`${safeName(state.document.name)}.json`);dirty=false;setSave("Exporté");toast("Export total créé.","ok")}
+async function saveDirect(){try{setSave("Enregistrement");if(!fileHandle)fileHandle=await showSaveFilePicker({suggestedName:`${safeName(state.document.name)}.json`,types:[{description:"Document Matrix",accept:{"application/json":[".json"]}}]});const w=await fileHandle.createWritable();await w.write(JSON.stringify(exportPayload(),null,2));await w.close();dirty=false;lastExternal={id:state.document.id,revision:state.document.revision,hash:hashText(JSON.stringify(state))};setSave("Enregistré");toast("Fichier enregistré.","ok")}catch(e){setSave("Échec");if(e.name!=="AbortError")toast(e.message,"error")}}
+function validateImport(d){if(!d||typeof d!=="object"||!d.document||!Array.isArray(d.equipments)||!Array.isArray(d.services)||!Array.isArray(d.flows))throw Error("Le fichier n'est pas un document Matrix valide.");if(d.schemaVersion>SCHEMA_VERSION)throw Error("Cette version de schéma est plus récente que l'application.");if(d.catalogVersion>CATALOG_VERSION)throw Error("Cette version de catalogue est inconnue.");return d}
+function importFile(file){const r=new FileReader();r.onload=()=>{try{const data=validateImport(JSON.parse(r.result));modal("Importer le document total",`<p><b>${esc(data.document.name)}</b></p><p>${data.equipments.length} équipements · ${data.services.length} services · ${data.flows.length} flux</p><div class="field"><label>Mode</label><select name="mode"><option value="replace">Remplacement total</option><option value="merge">Fusion</option></select></div>`,fd=>{const mode=fd.get("mode");if(mode==="replace")replaceImport(data);else mergeImport(data)},{submit:"Importer"})}catch(e){toast(e.message,"error")}};r.readAsText(file)}
+function replaceImport(data){const backup=clone(state);download(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-securite.json`);state=clone(data);currentUserId=null;undoState={label:"remplacement total",state:backup};dirty=true;scheduleRecovery();render();ensureUser();toast("Document remplacé.","ok")}
+function mergeImport(data){
+  const incoming=clone(data),backup=clone(state);
+  transact("Fusion appliquée",()=>{
+    for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const target=state[key],existing=new Set(target.map(x=>x.id));for(const x of incoming[key]||[]){if(!existing.has(x.id)){let c=clone(x);if("name"in c){const scope=y=>key==="services"?y.equipmentId===c.equipmentId:key==="vlans"?y.zoneId===c.zoneId:true;if(target.some(y=>scope(y)&&norm(y.name)===norm(c.name)))c.name=nextName(c.name,target,scope)}target.push(c)}}}
+  },{destructive:true});undoState={label:"fusion",state:backup};
+}
+function regenerateIds(doc){const d=clone(doc),map=new Map();const collections=["users","zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","equipments","services","flows"];for(const key of collections)for(const x of d[key])if(!x.builtin){const n=uid();map.set(x.id,n);x.id=n}for(const e of d.equipments){for(const i of e.interfaces){const ni=uid();map.set(i.id,ni);i.id=ni;for(const ip of i.ips){const n=uid();map.set(ip.id,n);ip.id=n}for(const dns of i.dns){const n=uid();map.set(dns.id,n);dns.id=n;dns.ipIds=(dns.ipIds||[]).map(x=>map.get(x)||x)}for(const h of e.history||[])h.id=uid()}}for(const s of d.services){s.equipmentId=map.get(s.equipmentId)||s.equipmentId;for(const l of s.listeners||[]){const old=l.id,n=uid();map.set(old,n);l.id=n;l.refId=map.get(l.refId)||l.refId}for(const h of s.history||[])h.id=uid()}for(const e of d.equipments){e.typeId=map.get(e.typeId)||e.typeId;e.zoneId=map.get(e.zoneId)||e.zoneId}for(const v of d.vlans)v.zoneId=map.get(v.zoneId)||v.zoneId;for(const p of d.knownPorts)p.protocolId=map.get(p.protocolId)||p.protocolId;for(const f of d.flows){f.protocolId=map.get(f.protocolId)||f.protocolId;f.endpoints.forEach(ep=>{ep.serviceId=map.get(ep.serviceId)||ep.serviceId;ep.listenerId=map.get(ep.listenerId)||ep.listenerId})}d.document.id=uid();d.document.revision=0;d.document.parentHash=null;return d}
+function createIndependentCopy(){confirmAction("Créer une copie indépendante","Tous les UUID métier seront renouvelés.",()=>{state=regenerateIds(state);currentUserId=null;fileHandle=null;lastExternal=null;dirty=true;scheduleRecovery();render();ensureUser();toast("Copie indépendante créée.","ok")})}
+function resetApplication(){const backup=clone(state);download(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-securite.json`);confirmAction("Réinitialiser l'application","La sauvegarde de sécurité vient d'être téléchargée. Confirmez-vous la réinitialisation ?",()=>{state=newDocument();currentUserId=null;fileHandle=null;lastExternal=null;undoState=null;localStorage.removeItem("matrix:prefs");recoveryClear().finally(()=>{render();ensureUser();toast("Application réinitialisée.","ok")})})}
+function undoLast(){if(!undoState)return;const previous=undoState;undoState=null;state=previous.state;state.document.revision++;state.document.updatedAt=now();dirty=true;scheduleRecovery();render();toast("Opération annulée.","ok")}
+function savePrefs(){const p=loadPrefs();p.theme=document.documentElement.dataset.theme||"system";p.users=p.users||{};p.users[state.document.id]=currentUserId;localStorage.setItem("matrix:prefs",JSON.stringify(p))}
+function loadPrefs(){try{return JSON.parse(localStorage.getItem("matrix:prefs"))||{}}catch{return{}}}
+let recoveryTimer;function scheduleRecovery(){clearTimeout(recoveryTimer);recoveryTimer=setTimeout(()=>recoveryPut(state),250)}
+function openDb(){return new Promise((resolve,reject)=>{const r=indexedDB.open("matrix-recovery",1);r.onupgradeneeded=()=>r.result.createObjectStore("documents",{keyPath:"document.id"});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function recoveryPut(d){try{const db=await openDb(),tx=db.transaction("documents","readwrite");tx.objectStore("documents").put(clone(d));await new Promise((res,rej)=>{tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}catch(e){console.warn(e)}}
+async function recoveryList(){try{const db=await openDb(),tx=db.transaction("documents"),r=tx.objectStore("documents").getAll(),all=await new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});db.close();return all}catch{return[]}}
+async function recoveryClear(){try{const db=await openDb(),tx=db.transaction("documents","readwrite");tx.objectStore("documents").clear();return new Promise(res=>tx.oncomplete=res)}catch{}}
+async function ensureUser(){const prefs=loadPrefs(),remembered=prefs.users?.[state.document.id];if(remembered&&state.users.some(x=>x.id===remembered))currentUserId=remembered;if(!currentUser()&&state.users.length){modal("Choisir l'utilisateur",`<div class="field"><label>Utilisateur courant</label><select name="userId">${options(state.users,"",x=>`${x.pseudo} — ${x.label}`)}</select></div>`,fd=>{const id=fd.get("userId");if(!id)throw Error("Sélectionnez un utilisateur.");selectUser(id)},{submit:"Continuer"})}else if(!state.users.length)openUserForm(null,true);render()}
+$("#docName").addEventListener("change",e=>{const name=e.target.value.trim();if(!name){e.target.value=state.document.name;return}transact("Document renommé",()=>state.document.name=name)});
+$("#themeButton").onclick=()=>{const cur=document.documentElement.dataset.theme||"light",next=cur==="dark"?"light":"dark";document.documentElement.dataset.theme=next;savePrefs()};
+$("#userButton").onclick=()=>setView("users");
+$$("nav button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+$("#fileInput").onchange=e=>{if(e.target.files[0])importFile(e.target.files[0]);e.target.value=""};
+$("#modal").addEventListener("cancel",e=>{if(!state.users.length){e.preventDefault();toast("Un utilisateur est obligatoire.","error")}});
+const pref=loadPrefs();let theme=pref.theme;if(!theme||theme==="system")theme=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";document.documentElement.dataset.theme=theme;
+render();ensureUser();recoveryList().then(list=>{const others=list.filter(x=>x.document.id!==state.document.id);if(others.length)toast(`${others.length} récupération(s) disponible(s) dans Données.`)});
+</script>
+</body>
+</html>
