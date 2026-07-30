@@ -730,9 +730,9 @@ Informations Git relevées le 30 juillet 2026 :
 - Dépôt distant : `origin`, URL `https://github.com/PsyCh0Taz/PDC.git`.
 - Branche de travail : `main`.
 - Branche amont : `origin/main`.
-- Dernier commit intégré localement : `bc00c1b46ec95dea90000216f32286682e091019` (`matrix`).
-- Dernier commit connu sur `origin/main` : `bc00c1b46ec95dea90000216f32286682e091019`.
+- Dernier commit intégré localement : `c6d2808` (`matrix: secure import publication`).
+- Dernier commit connu sur `origin/main` : `c6d2808`.
 - Au moment du relevé, la branche locale et la branche distante connue pointent sur le même commit.
-- Modifications Matrix non validées : `matrix/index.html` et `matrix/project.md`.
+- Modifications Matrix non validées au point de reprise : aucune, avant la présente mise à jour du suivi.
 - Autres modifications présentes dans le dépôt mais hors du projet Matrix : `pdc/classes/Auth.php` et `pdc/config/config.php`. Elles appartiennent à un autre travail et ne doivent pas être incluses dans un commit Matrix sans vérification explicite.
 - Git considère la racine comme appartenant au compte Windows `Taz`, tandis que Codex utilise un compte isolé. Les commandes Codex utilisent donc ponctuellement `-c safe.directory=D:/PDC/www` sans modifier la configuration Git globale.
