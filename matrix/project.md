@@ -777,6 +777,15 @@ Lot réseau poursuivi — confirmation des impacts :
 - Après confirmation, chaque flux impacté reçoit l'anomalie explicite « configuration réseau modifiée à vérifier » et passe automatiquement en DRAFT.
 - La modification ultérieure du flux constitue sa revue et retire cette anomalie si ses données sont de nouveau valides.
 
+Lot persistance poursuivi — réinitialisation sécurisée :
+- Avant la réinitialisation, l'application inventorie toutes les récupérations locales et distingue celles des autres documents.
+- Chaque récupération d'un autre document peut être exportée individuellement depuis la fenêtre de confirmation.
+- Une sauvegarde JSON du document courant est proposée avant l'affichage de la confirmation finale.
+- L'utilisateur doit confirmer avoir vérifié cette sauvegarde et exporté les récupérations qu'il souhaite conserver.
+- Les données chargées ne sont remplacées qu'après la réussite de l'effacement IndexedDB.
+- Un échec d'ouverture ou de transaction IndexedDB annule la publication du nouvel état et affiche une erreur explicite.
+- Après réussite seulement, les préférences, l'utilisateur courant et la référence du fichier ouvert sont détachés.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.
