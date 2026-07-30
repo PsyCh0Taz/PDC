@@ -726,6 +726,7 @@ Lot cartographique poursuivi — déplacement manuel :
 - La suppression d'un équipement retire ses positions dans les trois formats.
 - La création d'une copie indépendante remappe les clés de position vers les nouveaux UUID d'équipement.
 - La fiche d'un équipement déplacé propose de rétablir uniquement sa position automatique dans le format d'écran courant.
+- Le clic synthétique suivant un glisser-déplacer est neutralisé afin de ne pas ouvrir involontairement la fiche de l'équipement.
 
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.

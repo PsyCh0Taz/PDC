@@ -408,7 +408,7 @@ function bindEquipmentDragging(svg,root){
   $$(".equipment-node",root).forEach(g=>{
     let drag=null;g.addEventListener("pointerdown",e=>{if(e.button!==0||e.target.closest(".service-node"))return;e.stopPropagation();drag={clientX:e.clientX,clientY:e.clientY,x:+g.dataset.x,y:+g.dataset.y,moved:false};g.setPointerCapture(e.pointerId)});
     g.addEventListener("pointermove",e=>{if(!drag)return;const rect=svg.getBoundingClientRect(),v=svg.viewBox.baseVal,dx=(e.clientX-drag.clientX)*v.width/rect.width,dy=(e.clientY-drag.clientY)*v.height/rect.height;drag.moved=drag.moved||Math.hypot(dx,dy)>4;if(drag.moved)g.setAttribute("transform",`translate(${dx} ${dy})`);drag.dx=dx;drag.dy=dy});
-    const stop=e=>{if(!drag)return;const d=drag;drag=null;if(g.hasPointerCapture(e.pointerId))g.releasePointerCapture(e.pointerId);if(!d.moved)return;e.preventDefault();e.stopPropagation();const format=mapFormat(),x=Math.round((d.x+(d.dx||0))*10)/10,y=Math.round((d.y+(d.dy||0))*10)/10;transact("Position cartographique enregistrée",()=>{state.positions[format]=state.positions[format]||{};state.positions[format][g.dataset.equipment]={x,y}})};
+    const stop=e=>{if(!drag)return;const d=drag;drag=null;if(g.hasPointerCapture(e.pointerId))g.releasePointerCapture(e.pointerId);if(!d.moved)return;g.dataset.dragged="1";e.preventDefault();e.stopPropagation();const format=mapFormat(),x=Math.round((d.x+(d.dx||0))*10)/10,y=Math.round((d.y+(d.dy||0))*10)/10;transact("Position cartographique enregistrée",()=>{state.positions[format]=state.positions[format]||{};state.positions[format][g.dataset.equipment]={x,y}})};
     g.addEventListener("pointerup",stop);g.addEventListener("pointercancel",stop)
   })
 }
@@ -439,7 +439,7 @@ function renderMap(){
   bindMapViewport($("#mapSvg"),fullHeight);
   bindEquipmentDragging($("#mapSvg"),root);
   $$(".map-connection",root).forEach(g=>{const open=()=>openFlowGroup(g.dataset.flowGroup.split(","));g.onclick=open;g.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}}});
-  $$(".equipment-node",root).forEach(g=>{const open=()=>openEquipmentDetail(g.dataset.equipment);g.onclick=open;g.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest(".service-node")){e.preventDefault();open()}}});
+  $$(".equipment-node",root).forEach(g=>{const open=()=>openEquipmentDetail(g.dataset.equipment);g.onclick=e=>{if(g.dataset.dragged){delete g.dataset.dragged;e.preventDefault();return}open()};g.onkeydown=e=>{if((e.key==="Enter"||e.key===" ")&&!e.target.closest(".service-node")){e.preventDefault();open()}}});
   $$(".service-node",root).forEach(g=>{const open=e=>{e?.stopPropagation();openServiceDetail(g.dataset.service)};g.onclick=open;g.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open(e)}}});
 }
 function openFlowGroup(ids){
