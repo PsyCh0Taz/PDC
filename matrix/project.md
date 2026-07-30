@@ -705,6 +705,16 @@ Recette Edge complémentaire :
 - Aucun écran blanc ni défaut bloquant n'est visible sur cette capture.
 - La capture temporaire de recette a été supprimée après inspection et n'est pas suivie par Git.
 
+Lot cartographique poursuivi — zoom et panoramique :
+- Ajout de commandes accessibles de zoom avant, zoom arrière et recadrage complet.
+- La molette permet également de zoomer avec des bornes empêchant un grossissement ou un recul excessif.
+- Le glisser-déplacer du fond de carte permet le panoramique à la souris, au stylet et au tactile via les événements de pointeur.
+- Le déplacement du fond n'intercepte pas l'activation des équipements, services ou connexions.
+- Le curseur indique les états disponibles et actifs du panoramique.
+- Le cadrage courant est mémorisé dans les préférences locales séparément pour les formats ordinateur, tablette et téléphone.
+- Le cadrage reste exclu du document métier exporté, conformément à la séparation entre préférences d'interface et données.
+- Les filtres disposent désormais d'un libellé de réinitialisation distinct du bouton de recadrage.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
@@ -757,6 +767,7 @@ Prochain lot recommandé :
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
 - Ajouter ensuite la détection et la résolution des collisions métier entre UUID différents, avec remappage des relations.
+- Ajouter le déplacement manuel des nœuds avec positions persistées dans le document par format d'écran.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
