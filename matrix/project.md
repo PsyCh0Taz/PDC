@@ -747,10 +747,18 @@ Lot cartographique poursuivi — déplacement manuel :
 - La fiche d'un équipement déplacé propose de rétablir uniquement sa position automatique dans le format d'écran courant.
 - Le clic synthétique suivant un glisser-déplacer est neutralisé afin de ne pas ouvrir involontairement la fiche de l'équipement.
 
+Lot réseau poursuivi — associations DNS/IP :
+- La saisie d'une interface accepte désormais le format `nom DNS | IP, IP` pour associer précisément un nom à zéro, une ou plusieurs adresses.
+- Chaque adresse déclarée après le séparateur doit appartenir à la même interface.
+- Les associations sont enregistrées par UUID d'adresse et survivent donc à une modification textuelle conservant la même IP.
+- La réouverture du formulaire restitue les associations sous une forme lisible utilisant les adresses.
+- Un nom sans association reste valide et représente un DNS dont la correspondance IP n'est pas renseignée.
+- La validation d'import refuse une association vers une autre interface, une IP inexistante ou le même UUID d'IP répété.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
-- Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
-- Le lancement headless Edge s'est terminé avec un code de sortie nul, mais n'a retourné aucun DOM exploitable dans cette session ; cette vérification reste donc à refaire visuellement.
+- Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.
+- Une capture Edge headless a confirmé le rendu initial ; les parcours interactifs avancés restent à vérifier dans un navigateur normal.
 - La recette avec des fichiers JSON valides et volontairement corrompus reste à effectuer dans un navigateur normal.
 - Le parcours aperçu, téléchargement, annulation et confirmation doit également être inclus dans cette recette.
 
@@ -780,13 +788,13 @@ Recette manuelle prioritaire à effectuer sur l'autre poste :
 16. Supprimer une seule récupération et vérifier que les autres restent disponibles.
 
 Limites et écarts connus par rapport aux spécifications :
-- La fusion actuelle est additive et simple. Elle n'implémente pas encore la résolution complète des conflits métier, l'union déterministe des historiques ni toutes les règles de concurrence décrites dans les spécifications.
+- La fusion gère les conflits de même UUID, les principales collisions métier, les remappages, les historiques et les positions, mais sa recette exhaustive avec des graphes conflictuels imbriqués reste à réaliser.
+- L'option de remappage d'import vers un nouvel UUID distinct de l'UUID importé n'est pas encore proposée séparément lorsque le simple renommage ne suffit pas.
 - Les migrations de schéma et de catalogue ne sont pas encore implémentées ; une version de schéma antérieure est donc refusée explicitement.
-- La cartographie utilise une disposition automatique fixe. Le déplacement manuel, le zoom, le panoramique et la sauvegarde des positions par format d'écran restent à réaliser.
+- La cartographie permet zoom, panoramique et positions manuelles par format, mais la géométrie des zones reste automatique et ne s'agrandit pas autour des équipements déplacés hors de leur cadre initial.
 - Les auto-flux sont dessinés sous forme de boucle, mais leur géométrie fixe doit être vérifiée en présence de nombreux services proches.
 - Les filtres cartographiques doivent être validés sur des jeux de données où les statuts de l'équipement et de ses services diffèrent.
 - La recherche globale et tous les filtres structurés prévus ne sont pas encore complets.
-- Les associations précises entre un nom DNS et une ou plusieurs IP de son interface ne disposent pas encore d'une interface complète.
 - La confirmation détaillée des impacts avant toutes les modifications réseau sensibles reste partielle.
 - Les objectifs de volumétrie n'ont pas encore été mesurés.
 - Les récupérations IndexedDB restent propres au navigateur, au profil et à l'origine locale utilisés. Elles ne sont pas synchronisées par Git et ne remplacent jamais les fichiers JSON exportés.
@@ -797,7 +805,8 @@ Prochain lot recommandé :
 - Effectuer la recette d'import avec un export valide, puis des documents altérés couvrant chaque famille d'anomalies, et compléter les contrôles selon les défauts observés.
 - Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
-- Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
+- Construire deux fichiers de recette conflictuels couvrant les décisions courant, importé, duplication, remappages secondaires, historiques et positions.
+- Poursuivre ensuite la recherche globale, les filtres structurés et l'interface d'association DNS/IP.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
