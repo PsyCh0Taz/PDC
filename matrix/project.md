@@ -664,6 +664,37 @@ Sous-lot suivant — divergence du fichier externe :
 - Le choix « nouveau fichier » n'abandonne l'ancien descripteur qu'après la réussite du nouvel enregistrement.
 - L'écriture d'un état candidat d'import dans le fichier courant est également refusée si une divergence est détectée entre-temps.
 
+Sous-lot suivant — compléments de validation métier :
+- Correction du validateur pour accepter le mode VLAN réel `none` et contrôler les champs persistés `accessVlanId` et `nativeVlanId`.
+- Vérification de l'appartenance de chaque VLAN à la zone de l'équipement, des exigences accès/trunk et de l'absence de VLAN natif également tagué.
+- Vérification des préfixes IP, de l'appartenance des IP aux VLAN portés par l'interface et de l'unicité d'une adresse dans une même zone et un même VLAN.
+- Vérification des associations DNS vers des IP existantes de la même interface.
+- Vérification de la cohérence entre le type déclaré d'un point d'écoute et l'élément réseau réellement référencé.
+- Détection des noms ou clés métier en double pour les utilisateurs, zones, référentiels, VLAN, équipements, interfaces, DNS et services.
+- Détection des chevauchements de ports ayant des usages différents, des auto-flux aberrants et des clés techniques de flux dupliquées.
+
+État des migrations :
+- L'historique Git complet de `matrix/index.html` a été examiné.
+- La version initiale du prototype utilisait déjà `schemaVersion: 1` et aucun export d'un schéma antérieur n'est défini dans le dépôt.
+- Aucune migration rétroactive n'est donc ajoutée sans format source réel ; les versions antérieures restent refusées explicitement.
+- La première évolution incompatible du modèle devra augmenter `SCHEMA_VERSION` et fournir dans le même lot sa migration depuis la version 1 ainsi que ses fichiers de recette.
+
+Première tranche de fusion avancée — conflits de même UUID :
+- La fusion compare désormais le contenu métier des éléments portant le même UUID au lieu de les ignorer silencieusement.
+- Les UUID, dates de création et dates de modification sont exclus de cette comparaison.
+- Un élément strictement équivalent n'est pas réimporté et la donnée courante est conservée.
+- Chaque contenu différent doit recevoir une décision explicite « conserver la donnée courante » ou « utiliser la donnée importée ».
+- Une commande permet d'appliquer la même décision à tous les conflits affichés.
+- Les décisions sont appliquées uniquement à la copie importée préparée en mémoire.
+- Le candidat fusionné est entièrement revalidé avant sauvegarde ou publication ; une relation devenue invalide annule toute la fusion.
+- Les collisions métier entre UUID différents, le remappage d'import et l'union déterministe des historiques restent à traiter dans les tranches suivantes.
+
+Recette Edge complémentaire :
+- Une capture réelle a été produite avec Microsoft Edge en mode headless à la résolution 1 440 × 1 000.
+- Le tableau de bord, la navigation, les compteurs initiaux et la fenêtre obligatoire « Nouvel utilisateur » sont rendus correctement.
+- Aucun écran blanc ni défaut bloquant n'est visible sur cette capture.
+- La capture temporaire de recette a été supprimée après inspection et n'est pas suivie par Git.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
@@ -714,7 +745,8 @@ Prochain lot recommandé :
 - Effectuer la recette d'import avec un export valide, puis des documents altérés couvrant chaque famille d'anomalies, et compléter les contrôles selon les défauts observés.
 - Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
-- Poursuivre avec les migrations de schéma dans un lot versionné et testable.
+- Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
+- Ajouter ensuite la détection et la résolution des collisions métier entre UUID différents, avec remappage des relations.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
