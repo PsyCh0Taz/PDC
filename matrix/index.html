@@ -507,9 +507,9 @@ function showImportError(e){if(!e.validationErrors){toast(e.message||String(e),"
 function importPreview(data,mode){
   const rows=[["Document",data.document.name],["UUID",data.document.id],["Révision",data.document.revision],["Utilisateurs",data.users.length],["Zones / VLAN",`${data.zones.length} / ${data.vlans.length}`],["Équipements",data.equipments.length],["Services",data.services.length],["Flux",data.flows.length]];
   const future=[...data.equipments,...data.services].flatMap(x=>(x.history||[]).map(h=>({owner:x.name,event:h}))).filter(x=>Date.parse(x.event.occurredAt)>Date.now()+60000);
-  return`<div class="errorbox"><b>${mode==="replace"?"Remplacement total":"Fusion additive"}</b><br>${mode==="replace"?"Toutes les données courantes seront remplacées.":"Les éléments importés absents du document courant seront ajoutés ; les conflits avancés ne sont pas encore résolus."}</div>${future.length?`<div class="errorbox"><b>Anomalie d'horloge</b><br>${future.length} événement(s) d'historique sont datés dans le futur. Ils seront conservés sans modification.<ul>${future.slice(0,10).map(x=>`<li>${esc(x.owner)} · ${esc(x.event.occurredAt)} · ${esc(x.event.pseudo)}</li>`).join("")}</ul>${future.length>10?`<p>Et ${future.length-10} autre(s).</p>`:""}</div>`:""}<dl>${rows.map(([k,v])=>`<dt><b>${esc(k)}</b></dt><dd>${esc(v)}</dd>`).join("")}</dl><p>Une sauvegarde JSON du document courant devra être téléchargée et confirmée avant l'application.</p>`
+  return`<div class="errorbox"><b>${mode==="replace"?"Remplacement total":"Fusion contrôlée"}</b><br>${mode==="replace"?"Toutes les données courantes seront remplacées.":"Les décisions de conflit et remappages ont été préparés en mémoire ; le candidat complet sera encore validé avant publication."}</div>${future.length?`<div class="errorbox"><b>Anomalie d'horloge</b><br>${future.length} événement(s) d'historique sont datés dans le futur. Ils seront conservés sans modification.<ul>${future.slice(0,10).map(x=>`<li>${esc(x.owner)} · ${esc(x.event.occurredAt)} · ${esc(x.event.pseudo)}</li>`).join("")}</ul>${future.length>10?`<p>Et ${future.length-10} autre(s).</p>`:""}</div>`:""}<dl>${rows.map(([k,v])=>`<dt><b>${esc(k)}</b></dt><dd>${esc(v)}</dd>`).join("")}</dl><p>Une sauvegarde JSON du document courant devra être téléchargée et confirmée avant l'application.</p>`
 }
-function prepareImport(data,mode){modal("Aperçu avant import",importPreview(data,mode),()=>setTimeout(()=>confirmImportBackup(data,mode),0),{submit:"Créer la sauvegarde"})}
+function prepareImport(data,mode,plan=null){modal("Aperçu avant import",importPreview(data,mode),()=>setTimeout(()=>confirmImportBackup(data,mode,plan),0),{submit:"Créer la sauvegarde"})}
 function mergeComparable(value){
   if(Array.isArray(value))return value.map(mergeComparable);
   if(value&&typeof value==="object"){const out={};for(const key of Object.keys(value).sort())if(!["id","createdAt","updatedAt"].includes(key))out[key]=mergeComparable(value[key]);return out}
@@ -530,7 +530,7 @@ function unionStatusHistory(current,incoming,status){
   const last=events.at(-1)?.newStatus||null;if(last!==status)events.push(historyEntry(last,status,"résolution de fusion"));return events
 }
 function resolveMergeInput(data){
-  const analysis=prepareMergeInput(data);if(!analysis.conflicts.length){prepareImport(analysis.prepared,"merge");return}
+  const analysis=prepareMergeInput(data);if(!analysis.conflicts.length){resolveBusinessMergeInput(analysis.prepared);return}
   const labels={zones:"zone",vlans:"VLAN",equipmentTypes:"type d'équipement",serviceTypes:"type de service",protocols:"protocole",knownPorts:"port connu",users:"utilisateur",equipments:"équipement",services:"service",flows:"flux"};
   modal("Résoudre les conflits d'UUID",`<div class="errorbox">${analysis.conflicts.length} élément(s) portent le même UUID avec un contenu différent. Chaque décision est obligatoire.</div><div class="field"><label>Appliquer à tous</label><select id="bulkConflict"><option value="">— Choisir individuellement —</option><option value="current">Conserver les données courantes</option><option value="imported">Utiliser les données importées</option></select></div>${analysis.conflicts.map((c,i)=>`<div class="listitem"><b>${esc(labels[c.key]||c.key)} · ${esc(c.current.name||c.current.pseudo||c.id)}</b><br><span class="muted">UUID ${esc(c.id)}</span><div class="field"><label>Décision</label><select name="conflict-${i}" data-conflict-choice required><option value="">— Décision obligatoire —</option><option value="current">Conserver la donnée courante</option><option value="imported">Utiliser la donnée importée</option></select></div></div>`).join("")}`,fd=>{
     analysis.conflicts.forEach((c,i)=>{
@@ -538,32 +538,64 @@ function resolveMergeInput(data){
       if(hasHistory)resolved.history=unionStatusHistory(c.current,c.incoming,resolved.status);
       if(choice==="current"&&!hasHistory)analysis.prepared[c.key]=analysis.prepared[c.key].filter(x=>x.id!==c.id);else analysis.prepared[c.key]=analysis.prepared[c.key].map(x=>x.id===c.id?resolved:x)
     });
-    setTimeout(()=>prepareImport(analysis.prepared,"merge"),0)
+    setTimeout(()=>resolveBusinessMergeInput(analysis.prepared),0)
   },{submit:"Continuer"});$("#bulkConflict").onchange=e=>{$$("[data-conflict-choice]",$("#modalBody")).forEach(s=>s.value=e.target.value)}
 }
-function confirmImportBackup(data,mode){
+function remapDocumentRelations(doc,remap){
+  const r=id=>remap.get(id)||id;
+  for(const v of doc.vlans)v.zoneId=r(v.zoneId);for(const p of doc.knownPorts)p.protocolId=r(p.protocolId);
+  for(const e of doc.equipments){e.typeId=r(e.typeId);e.zoneId=r(e.zoneId);for(const n of e.interfaces||[]){n.accessVlanId=r(n.accessVlanId);n.nativeVlanId=r(n.nativeVlanId);n.taggedVlanIds=(n.taggedVlanIds||[]).map(r);for(const ip of n.ips||[])ip.vlanId=r(ip.vlanId);for(const dns of n.dns||[])dns.ipIds=(dns.ipIds||[]).map(r)}}
+  for(const s of doc.services){s.equipmentId=r(s.equipmentId);s.typeId=r(s.typeId);for(const l of s.listeners||[])l.refId=r(l.refId)}
+  for(const f of doc.flows){f.protocolId=r(f.protocolId);for(const ep of f.endpoints||[]){ep.serviceId=r(ep.serviceId);ep.listenerId=r(ep.listenerId)}}
+  for(const format of ["desktop","tablet","phone"]){const next={};for(const [id,p] of Object.entries(doc.positions?.[format]||{}))next[r(id)]=p;doc.positions[format]=next}
+  return doc
+}
+function businessKey(key,x){
+  if(key==="zones"||key==="users"||key==="equipments")return norm(x.name||x.pseudo);
+  if(["equipmentTypes","serviceTypes","protocols"].includes(key))return x.canonicalId||norm(x.name);
+  if(key==="vlans")return`${x.zoneId}/${x.number}`;
+  if(key==="knownPorts")return`${x.protocolId}/${x.number}`;
+  if(key==="services")return`${x.equipmentId}/${norm(x.name)}`;
+  if(key==="flows")return flowKey(x);
+  return""
+}
+function analyzeBusinessCollisions(data){
+  const collisions=[];for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const currentByKey=new Map(state[key].map(x=>[businessKey(key,x),x]));for(const incoming of data[key]){const current=currentByKey.get(businessKey(key,incoming));if(current&&current.id!==incoming.id)collisions.push({key,current,incoming,canDuplicate:!!incoming.name&&!incoming.canonicalId&&["zones","equipmentTypes","serviceTypes","protocols","equipments","services"].includes(key)})}}return collisions
+}
+function resolveBusinessMergeInput(data){
+  const prepared=clone(data),collisions=analyzeBusinessCollisions(prepared);if(!collisions.length){prepareImport(prepared,"merge");return}
+  const labels={zones:"zone",vlans:"VLAN",equipmentTypes:"type d'équipement",serviceTypes:"type de service",protocols:"protocole",knownPorts:"port connu",users:"utilisateur",equipments:"équipement",services:"service",flows:"flux"};
+  modal("Résoudre les collisions métier",`<div class="errorbox">${collisions.length} collision(s) entre UUID différents doivent être résolues avant la fusion.</div>${collisions.map((c,i)=>`<div class="listitem"><b>${esc(labels[c.key])} · ${esc(c.incoming.name||c.incoming.pseudo||c.incoming.id)}</b><br><span class="muted">Courant ${esc(c.current.id)}<br>Importé ${esc(c.incoming.id)}</span><div class="field"><label>Décision</label><select name="business-${i}" required><option value="">— Décision obligatoire —</option><option value="current">Conserver la donnée courante et remapper l'import</option><option value="imported">Utiliser la donnée importée et remapper les relations</option>${c.canDuplicate?'<option value="duplicate">Dupliquer l’élément importé avec un nouveau nom</option>':""}</select></div></div>`).join("")}`,fd=>{
+    const incomingRemap=new Map(),replaceCurrent=[];
+    collisions.forEach((c,i)=>{const choice=fd.get(`business-${i}`);if(choice==="current"){incomingRemap.set(c.incoming.id,c.current.id);prepared[c.key]=prepared[c.key].filter(x=>x.id!==c.incoming.id)}else if(choice==="imported")replaceCurrent.push({key:c.key,currentId:c.current.id,incomingId:c.incoming.id});else{const list=[...state[c.key],...prepared[c.key].filter(x=>x.id!==c.incoming.id)],item=prepared[c.key].find(x=>x.id===c.incoming.id);item.name=nextName(item.name,list,c.key==="services"?x=>x.equipmentId===item.equipmentId:()=>true)}});
+    remapDocumentRelations(prepared,incomingRemap);setTimeout(()=>prepareImport(prepared,"merge",{replaceCurrent}),0)
+  },{submit:"Continuer"})
+}
+function confirmImportBackup(data,mode,plan=null){
   try{download(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-avant-import.json`)}
   catch(e){toast("La sauvegarde de sécurité n'a pas pu être créée. Import annulé.","error");return}
-  modal("Confirmer la sauvegarde",`<p>La sauvegarde JSON du document courant a été proposée au téléchargement.</p><label><input type="checkbox" name="backupConfirmed" value="yes" required> J'ai vérifié que la sauvegarde a bien été téléchargée.</label><p class="muted">Sans cette confirmation, aucune donnée ne sera modifiée.</p>`,fd=>{if(fd.get("backupConfirmed")!=="yes")throw Error("Confirmez le téléchargement de la sauvegarde.");setTimeout(()=>chooseImportDestination(data,mode),0)},{submit:"Continuer"})
+  modal("Confirmer la sauvegarde",`<p>La sauvegarde JSON du document courant a été proposée au téléchargement.</p><label><input type="checkbox" name="backupConfirmed" value="yes" required> J'ai vérifié que la sauvegarde a bien été téléchargée.</label><p class="muted">Sans cette confirmation, aucune donnée ne sera modifiée.</p>`,fd=>{if(fd.get("backupConfirmed")!=="yes")throw Error("Confirmez le téléchargement de la sauvegarde.");setTimeout(()=>chooseImportDestination(data,mode,plan),0)},{submit:"Continuer"})
 }
 function importFile(file){const r=new FileReader();r.onload=()=>{try{const data=validateImport(JSON.parse(r.result));modal("Importer le document total",`<p><b>${esc(data.document.name)}</b></p><p>${data.equipments.length} équipements · ${data.services.length} services · ${data.flows.length} flux</p><div class="field"><label>Mode</label><select name="mode"><option value="replace">Remplacement total</option><option value="merge">Fusion</option></select></div>`,fd=>{const mode=fd.get("mode");setTimeout(()=>mode==="merge"?resolveMergeInput(data):prepareImport(data,mode),0)},{submit:"Afficher l'aperçu"})}catch(e){showImportError(e)}};r.onerror=()=>toast("Impossible de lire le fichier sélectionné.","error");r.readAsText(file)}
-function chooseImportDestination(data,mode){
-  if(!fileHandle){finalizeImport(data,mode,"detached");return}
-  modal("Destination du document importé",`<p>Un fichier local est actuellement associé à l'application. Choisissez la destination avant toute écriture.</p><div class="field"><label>Destination</label><select name="destination"><option value="current">Écrire dans le fichier actuellement ouvert</option><option value="new">Enregistrer dans un nouveau fichier</option><option value="detached">Détacher le fichier et travailler sans sauvegarde directe</option></select></div>`,fd=>setTimeout(()=>finalizeImport(data,mode,fd.get("destination")),0),{submit:"Appliquer"})
+function chooseImportDestination(data,mode,plan=null){
+  if(!fileHandle){finalizeImport(data,mode,"detached",plan);return}
+  modal("Destination du document importé",`<p>Un fichier local est actuellement associé à l'application. Choisissez la destination avant toute écriture.</p><div class="field"><label>Destination</label><select name="destination"><option value="current">Écrire dans le fichier actuellement ouvert</option><option value="new">Enregistrer dans un nouveau fichier</option><option value="detached">Détacher le fichier et travailler sans sauvegarde directe</option></select></div>`,fd=>setTimeout(()=>finalizeImport(data,mode,fd.get("destination"),plan),0),{submit:"Appliquer"})
 }
-function buildImportCandidate(data,mode){
+function buildImportCandidate(data,mode,plan=null){
   if(mode==="replace")return clone(data);
   const candidate=clone(state),before=clone(state),incoming=clone(data);
+  if(plan?.replaceCurrent?.length){const remap=new Map();for(const x of plan.replaceCurrent){candidate[x.key]=candidate[x.key].filter(item=>item.id!==x.currentId);remap.set(x.currentId,x.incomingId)}remapDocumentRelations(candidate,remap)}
   for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const target=candidate[key],existing=new Map(target.map((x,i)=>[x.id,i]));for(const x of incoming[key]||[]){const at=existing.get(x.id);if(at!==undefined){target[at]=clone(x);continue}let c=clone(x);if("name"in c){const scope=y=>key==="services"?y.equipmentId===c.equipmentId:key==="vlans"?y.zoneId===c.zoneId:true;if(target.some(y=>scope(y)&&norm(y.name)===norm(c.name)))c.name=nextName(c.name,target,scope)}target.push(c)}}
+  for(const format of ["desktop","tablet","phone"])for(const [id,pos] of Object.entries(incoming.positions?.[format]||{}))if(!candidate.positions[format][id])candidate.positions[format][id]=clone(pos);
   candidate.document.revision++;candidate.document.parentHash=hashText(JSON.stringify(before));candidate.document.updatedAt=now();return validateImport(candidate)
 }
 function publishImport(candidate,mode,backup,handle=null){
   state=candidate;currentUserId=null;fileHandle=handle;lastExternal=handle?{id:state.document.id,revision:state.document.revision,hash:hashText(JSON.stringify(state))}:null;undoState={label:mode==="replace"?"remplacement total":"fusion",state:backup};dirty=!handle;scheduleRecovery();render();setSave(handle?"Enregistré":"Non sauvegardé");ensureUser();toast(mode==="replace"?"Document remplacé.":"Fusion appliquée.","ok")
 }
-async function finalizeImport(data,mode,destination){
+async function finalizeImport(data,mode,destination,plan=null){
   const backup=clone(state);
   try{
-    const candidate=buildImportCandidate(data,mode);
+    const candidate=buildImportCandidate(data,mode,plan);
     if(destination==="detached"){publishImport(candidate,mode,backup,null);return}
     let handle=fileHandle;if(destination==="new")handle=await showSaveFilePicker({suggestedName:`${safeName(candidate.document.name)}.json`,types:[{description:"Document Matrix",accept:{"application/json":[".json"]}}]});
     if(destination==="current"&&lastExternal){const snapshot=await externalSnapshot(handle);if(snapshot.hash!==lastExternal.hash)throw Error("le fichier associé a été modifié ailleurs ; rechargez-le ou choisissez un nouveau fichier")}

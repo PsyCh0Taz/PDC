@@ -699,6 +699,18 @@ Deuxième tranche de fusion avancée — union des historiques :
 - L'aperçu d'import signale les événements datés de plus d'une minute dans le futur comme anomalies d'horloge.
 - Ces événements futurs sont listés avec leur élément, leur date et leur pseudo, mais leur contenu immuable n'est jamais corrigé automatiquement.
 
+Troisième tranche de fusion avancée — collisions métier et remappage :
+- Détection des collisions métier entre UUID différents pour les zones, VLAN, types, protocoles, ports connus, utilisateurs, équipements, services et flux.
+- Les clés comparées couvrent notamment les noms normalisés, pseudo, identifiants canoniques, couple zone/VLAN, couple protocole/port, couple équipement/service et clé technique de flux.
+- Chaque collision propose explicitement de conserver la donnée courante ou d'utiliser la donnée importée.
+- La duplication par renommage est proposée uniquement aux entités nommées pour lesquelles elle peut produire une clé valide et jamais aux valeurs canoniques intégrées.
+- Le choix de conserver la donnée courante remappe les relations importées vers son UUID avant de retirer l'élément importé en collision.
+- Le choix d'utiliser la donnée importée retire l'élément courant du candidat et remappe ses relations vers l'UUID importé.
+- Le remappage couvre zones, VLAN, référentiels, équipements, IP, DNS, services, points d'écoute, flux et positions cartographiques.
+- Les positions importées sans conflit sont ajoutées au candidat fusionné ; une position courante existante reste prioritaire.
+- Toutes les décisions et tous les remappages restent confinés à la copie candidate jusqu'à sa validation complète et sa sauvegarde éventuelle.
+- Une collision secondaire créée par plusieurs remappages est refusée par la validation finale plutôt que supprimée silencieusement.
+
 Recette Edge complémentaire :
 - Une capture réelle a été produite avec Microsoft Edge en mode headless à la résolution 1 440 × 1 000.
 - Le tableau de bord, la navigation, les compteurs initiaux et la fenêtre obligatoire « Nouvel utilisateur » sont rendus correctement.
@@ -779,7 +791,8 @@ Prochain lot recommandé :
 - Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
-- Ajouter ensuite la détection et la résolution des collisions métier entre UUID différents, avec remappage des relations.
+- Ajouter une seconde passe interactive pour résoudre les collisions secondaires créées par les premiers remappages.
+- Ajouter la résolution séparée des conflits de positions cartographiques.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
