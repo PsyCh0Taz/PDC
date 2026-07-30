@@ -786,6 +786,11 @@ Lot persistance poursuivi — réinitialisation sécurisée :
 - Un échec d'ouverture ou de transaction IndexedDB annule la publication du nouvel état et affiche une erreur explicite.
 - Après réussite seulement, les préférences, l'utilisateur courant et la référence du fichier ouvert sont détachés.
 
+Correctif des fenêtres modales :
+- Les boutons « Annuler » et la croix utilisent désormais `formnovalidate`.
+- Une fenêtre contenant des champs obligatoires vides peut donc être fermée sans déclencher la validation native du formulaire.
+- Les fenêtres explicitement obligatoires continuent de masquer ces deux commandes.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.

@@ -75,9 +75,9 @@ dialog{width:min(760px,calc(100% - 24px));max-height:92vh;border:1px solid var(-
 </div>
 <dialog id="modal">
   <form id="modalForm" method="dialog">
-    <div class="modalhead"><h2 id="modalTitle"></h2><button class="iconbtn" value="cancel" aria-label="Fermer">✕</button></div>
+    <div class="modalhead"><h2 id="modalTitle"></h2><button class="iconbtn" value="cancel" formnovalidate aria-label="Fermer">✕</button></div>
     <div id="modalBody" class="modalbody"></div>
-    <div id="modalFoot" class="modalfoot"><button class="btn" value="cancel">Annuler</button><button id="modalSubmit" class="btn primary" value="default">Enregistrer</button></div>
+    <div id="modalFoot" class="modalfoot"><button class="btn" value="cancel" formnovalidate>Annuler</button><button id="modalSubmit" class="btn primary" value="default">Enregistrer</button></div>
   </form>
 </dialog>
 <input id="fileInput" class="hidden" type="file" accept=".json,application/json">
