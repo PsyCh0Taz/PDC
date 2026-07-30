@@ -755,6 +755,20 @@ Lot réseau poursuivi — associations DNS/IP :
 - Un nom sans association reste valide et représente un DNS dont la correspondance IP n'est pas renseignée.
 - La validation d'import refuse une association vers une autre interface, une IP inexistante ou le même UUID d'IP répété.
 
+Lot recherche et filtres structurés :
+- La liste des équipements peut être filtrée simultanément par zone, type et statut.
+- Sa recherche textuelle couvre également les interfaces, adresses IP, adresses MAC et noms DNS.
+- La liste des services peut être filtrée par équipement, type et statut.
+- Sa recherche couvre aussi les libellés de points d'écoute.
+- La liste des flux peut être filtrée par service participant, protocole, état technique et sens.
+- Sa recherche textuelle inclut les anomalies, descriptions, services, protocoles, ports et usages.
+- Chaque vue propose une réinitialisation commune de son texte et de tous ses filtres structurés.
+- La recherche est temporisée à 100 ms afin d'éviter un rendu complet à chaque frappe rapide.
+- Une vue de recherche transversale réunit les équipements, interfaces, adresses IP, DNS, services et flux.
+- Les résultats réseau ouvrent directement la fiche de leur équipement ; les services et flux ouvrent leur propre fiche ou formulaire.
+- La saisie transversale exige deux caractères et limite l'affichage aux 250 premiers résultats pour préserver la fluidité.
+- Le focus et la position du curseur sont restaurés après chaque rendu temporisé.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.
@@ -794,7 +808,6 @@ Limites et écarts connus par rapport aux spécifications :
 - La cartographie permet zoom, panoramique et positions manuelles par format, mais la géométrie des zones reste automatique et ne s'agrandit pas autour des équipements déplacés hors de leur cadre initial.
 - Les auto-flux sont dessinés sous forme de boucle, mais leur géométrie fixe doit être vérifiée en présence de nombreux services proches.
 - Les filtres cartographiques doivent être validés sur des jeux de données où les statuts de l'équipement et de ses services diffèrent.
-- La recherche globale et tous les filtres structurés prévus ne sont pas encore complets.
 - La confirmation détaillée des impacts avant toutes les modifications réseau sensibles reste partielle.
 - Les objectifs de volumétrie n'ont pas encore été mesurés.
 - Les récupérations IndexedDB restent propres au navigateur, au profil et à l'origine locale utilisés. Elles ne sont pas synchronisées par Git et ne remplacent jamais les fichiers JSON exportés.
@@ -806,7 +819,6 @@ Prochain lot recommandé :
 - Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Construire deux fichiers de recette conflictuels couvrant les décisions courant, importé, duplication, remappages secondaires, historiques et positions.
-- Poursuivre ensuite la recherche globale, les filtres structurés et l'interface d'association DNS/IP.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
