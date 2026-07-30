@@ -564,3 +564,146 @@ CRITERES DE RECETTE :
 QUESTIONS RESTANTES :
 - Aucune question restante à l'issue de la dixième revue de cohérence.
 - Toutes les propositions formulées jusqu'à la Q125 ont été validées, remplacées par les réponses consignées ou supprimées à la demande de l'utilisateur.
+
+SUIVI D'AVANCEMENT :
+
+Ce chapitre sert de point de reprise entre les deux postes de développement. Il doit être mis à jour à chaque lot significatif, avant le commit et le push Git.
+
+Dernière mise à jour :
+- Date : 30 juillet 2026.
+- Application : prototype autonome contenu dans `index.html`.
+- Version déclarée dans l'application : 0.1.0.
+- Version du schéma de données : 1.
+- Version du catalogue intégré : 1.
+- Fichiers suivis dans ce dossier : `index.html` et `project.md`.
+- Environnement de cette session : Git 2.53.0 est fourni par GitHub Desktop à l'emplacement `C:\Users\Taz\AppData\Local\GitHubDesktop\app-3.6.3\resources\app\git\cmd\git.exe`. Node.js n'est pas disponible dans le `PATH`, les tests JavaScript par Node.js n'ont donc pas pu être exécutés.
+
+État fonctionnel actuellement implémenté :
+- Document autonome sans serveur, thèmes clair et sombre et interface responsive.
+- Gestion des utilisateurs déclaratifs et sélection de l'utilisateur courant.
+- Création, modification, détail, duplication et suppression des équipements.
+- Gestion des interfaces réseau, adresses IPv4 et IPv6, MAC, DNS et modes VLAN accès ou trunk.
+- Création, modification, duplication et suppression des services et de leurs points d'écoute.
+- Création, modification, duplication et suppression des flux, calcul automatique DRAFT ou OK, validation et normalisation des expressions de ports et détection de doublons techniques.
+- Référentiels des zones, VLAN, types d'équipement, types de service, protocoles et ports connus.
+- Historique des changements de statut des équipements et services.
+- Suppressions en cascade principales et invalidation des flux lorsque leur point d'écoute disparaît.
+- Import total par remplacement ou fusion simple, export JSON, sauvegarde directe lorsque l'API du navigateur est disponible, copie indépendante, récupération IndexedDB et réinitialisation.
+- Cartographie SVG avec vue tabulaire accessible, impression et export SVG.
+
+Dernier lot réalisé le 30 juillet 2026 — cartographie :
+- Ajout des filtres par zone, équipement, service, protocole, statut d'équipement ou service et état de flux.
+- Ajout d'une commande de réinitialisation des filtres.
+- Regroupement visuel des flux qui relient les mêmes services.
+- Affichage d'un compteur sur une connexion regroupée.
+- Ouverture du détail des flux regroupés par clic, touche Entrée ou barre d'espace.
+- Correction du sens des flèches pour les flux « distant vers local ».
+- Agrégation des deux sens en connexion bidirectionnelle, y compris lorsque les extrémités sont enregistrées dans l'ordre inverse.
+- Application des filtres à la vue tabulaire accessible.
+- Fichier modifié : `index.html`, principalement `renderMap()`, `openFlowGroup()` et les styles de cartographie.
+
+Complément du lot cartographique réalisé le 30 juillet 2026 :
+- Représentation des auto-flux par une boucle au-dessus du service, au lieu d'une ligne de longueur nulle.
+- Regroupement et compteur également appliqués aux auto-flux.
+- Prise en charge des flèches directionnelles sur les boucles.
+- Ouverture de la fiche détaillée d'un équipement depuis son nœud cartographique, à la souris ou au clavier.
+- Ouverture de la nouvelle fiche détaillée d'un service depuis son libellé cartographique, à la souris ou au clavier.
+- Ajout de la fiche détaillée d'un service dans la vue tabulaire des services.
+- La fiche du service récapitule son équipement, son type, sa version, son statut, sa description, ses points d'écoute, ses flux liés et son historique de statut.
+- Le détail d'une connexion regroupée permet désormais d'ouvrir directement chaque formulaire de flux.
+- Amélioration du retour visuel au survol et au focus des connexions, boucles et services.
+
+Lot de persistance réalisé le 30 juillet 2026 — récupérations locales :
+- Ajout dans la vue « Données » d'un panneau listant les copies automatiques présentes dans IndexedDB.
+- Tri des récupérations de la plus récemment modifiée à la plus ancienne.
+- Affichage pour chaque récupération du nom du document, de sa date, de sa révision et de son UUID.
+- Identification de la récupération correspondant au document courant.
+- Ajout d'une restauration avec confirmation explicite.
+- Avant toute restauration, téléchargement automatique d'une sauvegarde JSON du document courant.
+- Validation minimale du document récupéré avant son remplacement.
+- Après restauration, réinitialisation de l'utilisateur courant, du descripteur de fichier et de la référence externe afin d'éviter d'écrire dans l'ancien fichier.
+- Possibilité d'annuler la restauration via le mécanisme d'annulation destructive existant.
+- Ajout de la suppression ciblée d'une récupération avec confirmation, sans effacer toutes les autres copies locales.
+- Ajout d'un message explicite lorsque la récupération demandée a disparu ou est invalide.
+
+Lot de persistance poursuivi le 30 juillet 2026 — validation d'intégrité des imports :
+- Remplacement de la validation minimale par une validation globale exécutée avant toute proposition de remplacement ou de fusion.
+- Contrôle de l'enveloppe totale, des versions de schéma et de catalogue, des métadonnées du document et de la présence de toutes les collections attendues.
+- Contrôle des identifiants obligatoires et détection des UUID dupliqués dans les entités, interfaces, éléments réseau, points d'écoute et historiques.
+- Contrôle des champs métier obligatoires, statuts, dates d'historique, plages de VLAN et de ports.
+- Contrôle des références entre VLAN et zone, équipement et référentiels, service et équipement, point d'écoute et élément réseau, flux et services, protocoles ou points d'écoute.
+- Vérification que chaque point d'écoute appartient bien à l'équipement du service et que le dernier événement d'historique correspond au statut courant.
+- Refus des versions anciennes tant qu'aucune migration explicite n'est disponible, afin de ne jamais charger silencieusement un schéma non pris en charge.
+- Affichage de la liste détaillée des anomalies d'import dans une fenêtre dédiée, avec confirmation que le document courant reste inchangé.
+- Ajout d'un message distinct lorsque la lecture du fichier sélectionné échoue.
+- La restauration IndexedDB réutilise automatiquement la même validation complète.
+
+Vérifications de ce lot :
+- `git diff --check` ne signale aucune erreur de whitespace.
+- Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
+- Le lancement headless Edge s'est terminé avec un code de sortie nul, mais n'a retourné aucun DOM exploitable dans cette session ; cette vérification reste donc à refaire visuellement.
+- La recette avec des fichiers JSON valides et volontairement corrompus reste à effectuer dans un navigateur normal.
+
+Vérifications du dernier lot :
+- Comptage statique équilibré des accolades, parenthèses et crochets dans `index.html`.
+- Présence vérifiée des nouveaux gestionnaires de filtres, de clavier et de détail.
+- Microsoft Edge est installé sur le poste. Après autorisation d'exécution locale, le chargement headless de `index.html` a rendu le tableau de bord et le contenu de l'application sans erreur de syntaxe bloquante visible.
+- Les interactions cartographiques et le rendu des auto-flux doivent encore faire l'objet d'une recette visuelle dans un navigateur normal avec un jeu de données approprié.
+- Aucun test automatisé n'existe actuellement dans le dépôt.
+
+Recette manuelle prioritaire à effectuer sur l'autre poste :
+1. Ouvrir directement `index.html` dans Edge puis dans Firefox.
+2. Créer deux équipements, un service sur chacun et plusieurs flux entre ces services.
+3. Vérifier les flèches dans les trois sens : local vers distant, distant vers local et bidirectionnel.
+4. Vérifier qu'une seule connexion est dessinée pour plusieurs flux entre les mêmes services et que son compteur est exact.
+5. Ouvrir le groupe à la souris, avec Entrée puis avec la barre d'espace.
+6. Tester chaque filtre séparément, plusieurs filtres combinés, puis la réinitialisation.
+7. Vérifier que la vue tabulaire contient exactement les flux visibles après filtrage.
+8. Tester l'impression et l'export SVG.
+9. Contrôler la console JavaScript et l'attribut `data-js-error` de l'élément `<html>`.
+10. Créer un auto-flux valide et vérifier sa boucle, son sens, son compteur et son détail.
+11. Ouvrir les fiches d'un équipement et d'un service depuis la carte à la souris et au clavier.
+12. Depuis une connexion regroupée, ouvrir chaque flux puis annuler le formulaire.
+13. Modifier un document, attendre la copie automatique, puis vérifier sa présence dans « Données > Récupérations locales ».
+14. Restaurer une récupération et vérifier qu'une sauvegarde JSON du document remplacé est téléchargée.
+15. Vérifier le contenu restauré, la nouvelle sélection d'utilisateur et la possibilité d'annuler la restauration.
+16. Supprimer une seule récupération et vérifier que les autres restent disponibles.
+
+Limites et écarts connus par rapport aux spécifications :
+- La fusion actuelle est additive et simple. Elle n'implémente pas encore la résolution complète des conflits métier, l'union déterministe des historiques ni toutes les règles de concurrence décrites dans les spécifications.
+- Les migrations de schéma et de catalogue ne sont pas encore implémentées ; une version de schéma antérieure est donc refusée explicitement.
+- La cartographie utilise une disposition automatique fixe. Le déplacement manuel, le zoom, le panoramique et la sauvegarde des positions par format d'écran restent à réaliser.
+- Les auto-flux sont dessinés sous forme de boucle, mais leur géométrie fixe doit être vérifiée en présence de nombreux services proches.
+- Les filtres cartographiques doivent être validés sur des jeux de données où les statuts de l'équipement et de ses services diffèrent.
+- La recherche globale et tous les filtres structurés prévus ne sont pas encore complets.
+- Les associations précises entre un nom DNS et une ou plusieurs IP de son interface ne disposent pas encore d'une interface complète.
+- La confirmation détaillée des impacts avant toutes les modifications réseau sensibles reste partielle.
+- Les objectifs de volumétrie n'ont pas encore été mesurés.
+- Les récupérations IndexedDB restent propres au navigateur, au profil et à l'origine locale utilisés. Elles ne sont pas synchronisées par Git et ne remplacent jamais les fichiers JSON exportés.
+
+Prochain lot recommandé :
+- Terminer la stabilisation cartographique par la recette ci-dessus et corriger les éventuels défauts de rendu ou de navigation.
+- Effectuer la recette des récupérations locales sur Edge et Firefox.
+- Effectuer la recette d'import avec un export valide, puis des documents altérés couvrant chaque famille d'anomalies, et compléter les contrôles selon les défauts observés.
+- Poursuivre la persistance avec l'aperçu obligatoire, la confirmation de sauvegarde de sécurité et le choix de destination avant publication de l'état candidat.
+- Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
+
+Procédure de passage d'un poste à l'autre :
+1. Mettre à jour ce suivi avec la date, le lot terminé, les vérifications et la prochaine action précise.
+2. Vérifier la recette minimale dans un navigateur.
+3. Examiner `git status` et ne versionner que les fichiers attendus.
+4. Créer un commit décrivant le résultat fonctionnel, puis pousser la branche.
+5. Sur l'autre poste, tirer la même branche et lire d'abord cette section avant toute modification.
+6. Après reprise, inscrire ici le nom de la branche et le hash du commit de départ.
+
+Informations Git relevées le 30 juillet 2026 :
+- Racine du dépôt : `D:\PDC\www`.
+- Dépôt distant : `origin`, URL `https://github.com/PsyCh0Taz/PDC.git`.
+- Branche de travail : `main`.
+- Branche amont : `origin/main`.
+- Dernier commit intégré localement : `bc00c1b46ec95dea90000216f32286682e091019` (`matrix`).
+- Dernier commit connu sur `origin/main` : `bc00c1b46ec95dea90000216f32286682e091019`.
+- Au moment du relevé, la branche locale et la branche distante connue pointent sur le même commit.
+- Modifications Matrix non validées : `matrix/index.html` et `matrix/project.md`.
+- Autres modifications présentes dans le dépôt mais hors du projet Matrix : `pdc/classes/Auth.php` et `pdc/config/config.php`. Elles appartiennent à un autre travail et ne doivent pas être incluses dans un commit Matrix sans vérification explicite.
+- Git considère la racine comme appartenant au compte Windows `Taz`, tandis que Codex utilise un compte isolé. Les commandes Codex utilisent donc ponctuellement `-c safe.directory=D:/PDC/www` sans modifier la configuration Git globale.
