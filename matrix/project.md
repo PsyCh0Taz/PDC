@@ -769,6 +769,14 @@ Lot recherche et filtres structurés :
 - La saisie transversale exige deux caractères et limite l'affichage aux 250 premiers résultats pour préserver la fluidité.
 - Le focus et la position du curseur sont restaurés après chaque rendu temporisé.
 
+Lot réseau poursuivi — confirmation des impacts :
+- Une modification du mode VLAN, du VLAN d'accès ou natif, ou de la liste des VLAN tagués est détectée comme changement réseau sensible.
+- L'application calcule les points d'écoute, services et flux utilisant l'interface ou ses éléments réseau.
+- Lorsque des dépendances existent, la sauvegarde est bloquée jusqu'à la confirmation explicite dans le formulaire.
+- Le message de blocage indique le nombre de points d'écoute, de services distincts et de flux concernés.
+- Après confirmation, chaque flux impacté reçoit l'anomalie explicite « configuration réseau modifiée à vérifier » et passe automatiquement en DRAFT.
+- La modification ultérieure du flux constitue sa revue et retire cette anomalie si ses données sont de nouveau valides.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.
@@ -808,7 +816,7 @@ Limites et écarts connus par rapport aux spécifications :
 - La cartographie permet zoom, panoramique et positions manuelles par format, mais la géométrie des zones reste automatique et ne s'agrandit pas autour des équipements déplacés hors de leur cadre initial.
 - Les auto-flux sont dessinés sous forme de boucle, mais leur géométrie fixe doit être vérifiée en présence de nombreux services proches.
 - Les filtres cartographiques doivent être validés sur des jeux de données où les statuts de l'équipement et de ses services diffèrent.
-- La confirmation détaillée des impacts avant toutes les modifications réseau sensibles reste partielle.
+- Les impacts d'un changement de zone d'équipement restent bloqués lorsque des VLAN sont configurés ; aucun assistant de réaffectation groupée vers une nouvelle zone n'est encore disponible.
 - Les objectifs de volumétrie n'ont pas encore été mesurés.
 - Les récupérations IndexedDB restent propres au navigateur, au profil et à l'origine locale utilisés. Elles ne sont pas synchronisées par Git et ne remplacent jamais les fichiers JSON exportés.
 
