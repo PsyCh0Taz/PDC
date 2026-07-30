@@ -710,6 +710,13 @@ Troisième tranche de fusion avancée — collisions métier et remappage :
 - Les positions importées sans conflit sont ajoutées au candidat fusionné ; une position courante existante reste prioritaire.
 - Toutes les décisions et tous les remappages restent confinés à la copie candidate jusqu'à sa validation complète et sa sauvegarde éventuelle.
 - Une collision secondaire créée par plusieurs remappages est refusée par la validation finale plutôt que supprimée silencieusement.
+- Après chaque série de décisions, l'analyse métier est relancée sur une vue courante simulant les remplacements déjà choisis.
+- Les collisions secondaires créées par le remappage d'un parent sont ainsi présentées dans une nouvelle passe interactive.
+- Les décisions de remplacement déjà acquises sont mémorisées et ne sont jamais redemandées pendant la même fusion.
+- Les passes se poursuivent jusqu'à l'absence de collision détectable, puis la validation finale reste le dernier garde-fou atomique.
+- Les positions cartographiques sont comparées séparément après la résolution des contenus métier.
+- Pour chaque équipement et format d'écran ayant deux coordonnées différentes, l'utilisateur choisit explicitement la position courante ou importée.
+- Les positions sans conflit sont ajoutées automatiquement ; les décisions de position sont appliquées uniquement lors de la construction finale du candidat.
 
 Recette Edge complémentaire :
 - Une capture réelle a été produite avec Microsoft Edge en mode headless à la résolution 1 440 × 1 000.
@@ -791,8 +798,6 @@ Prochain lot recommandé :
 - Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
-- Ajouter une seconde passe interactive pour résoudre les collisions secondaires créées par les premiers remappages.
-- Ajouter la résolution séparée des conflits de positions cartographiques.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :

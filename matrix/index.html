@@ -559,17 +559,22 @@ function businessKey(key,x){
   if(key==="flows")return flowKey(x);
   return""
 }
-function analyzeBusinessCollisions(data){
-  const collisions=[];for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const currentByKey=new Map(state[key].map(x=>[businessKey(key,x),x]));for(const incoming of data[key]){const current=currentByKey.get(businessKey(key,incoming));if(current&&current.id!==incoming.id)collisions.push({key,current,incoming,canDuplicate:!!incoming.name&&!incoming.canonicalId&&["zones","equipmentTypes","serviceTypes","protocols","equipments","services"].includes(key)})}}return collisions
+function analyzeBusinessCollisions(data,currentDoc=state){
+  const collisions=[];for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const currentByKey=new Map(currentDoc[key].map(x=>[businessKey(key,x),x]));for(const incoming of data[key]){const current=currentByKey.get(businessKey(key,incoming));if(current&&current.id!==incoming.id)collisions.push({key,current,incoming,canDuplicate:!!incoming.name&&!incoming.canonicalId&&["zones","equipmentTypes","serviceTypes","protocols","equipments","services"].includes(key)})}}return collisions
 }
-function resolveBusinessMergeInput(data){
-  const prepared=clone(data),collisions=analyzeBusinessCollisions(prepared);if(!collisions.length){prepareImport(prepared,"merge");return}
+function resolveBusinessMergeInput(data,plan={replaceCurrent:[]}){
+  const prepared=clone(data),currentView=applyReplacementPlan(clone(state),plan),resolved=new Set(plan.replaceCurrent.map(x=>`${x.key}/${x.currentId}/${x.incomingId}`)),collisions=analyzeBusinessCollisions(prepared,currentView).filter(c=>!resolved.has(`${c.key}/${c.current.id}/${c.incoming.id}`));if(!collisions.length){resolvePositionMergeInput(prepared,plan,currentView);return}
   const labels={zones:"zone",vlans:"VLAN",equipmentTypes:"type d'équipement",serviceTypes:"type de service",protocols:"protocole",knownPorts:"port connu",users:"utilisateur",equipments:"équipement",services:"service",flows:"flux"};
   modal("Résoudre les collisions métier",`<div class="errorbox">${collisions.length} collision(s) entre UUID différents doivent être résolues avant la fusion.</div>${collisions.map((c,i)=>`<div class="listitem"><b>${esc(labels[c.key])} · ${esc(c.incoming.name||c.incoming.pseudo||c.incoming.id)}</b><br><span class="muted">Courant ${esc(c.current.id)}<br>Importé ${esc(c.incoming.id)}</span><div class="field"><label>Décision</label><select name="business-${i}" required><option value="">— Décision obligatoire —</option><option value="current">Conserver la donnée courante et remapper l'import</option><option value="imported">Utiliser la donnée importée et remapper les relations</option>${c.canDuplicate?'<option value="duplicate">Dupliquer l’élément importé avec un nouveau nom</option>':""}</select></div></div>`).join("")}`,fd=>{
     const incomingRemap=new Map(),replaceCurrent=[];
     collisions.forEach((c,i)=>{const choice=fd.get(`business-${i}`);if(choice==="current"){incomingRemap.set(c.incoming.id,c.current.id);prepared[c.key]=prepared[c.key].filter(x=>x.id!==c.incoming.id)}else if(choice==="imported")replaceCurrent.push({key:c.key,currentId:c.current.id,incomingId:c.incoming.id});else{const list=[...state[c.key],...prepared[c.key].filter(x=>x.id!==c.incoming.id)],item=prepared[c.key].find(x=>x.id===c.incoming.id);item.name=nextName(item.name,list,c.key==="services"?x=>x.equipmentId===item.equipmentId:()=>true)}});
-    remapDocumentRelations(prepared,incomingRemap);setTimeout(()=>prepareImport(prepared,"merge",{replaceCurrent}),0)
+    remapDocumentRelations(prepared,incomingRemap);setTimeout(()=>resolveBusinessMergeInput(prepared,{replaceCurrent:[...plan.replaceCurrent,...replaceCurrent]}),0)
   },{submit:"Continuer"})
+}
+function resolvePositionMergeInput(data,plan,currentView=applyReplacementPlan(clone(state),plan)){
+  const conflicts=[];for(const format of ["desktop","tablet","phone"])for(const [id,imported] of Object.entries(data.positions?.[format]||{})){const current=currentView.positions?.[format]?.[id];if(current&&(current.x!==imported.x||current.y!==imported.y))conflicts.push({format,id,current,imported})}
+  if(!conflicts.length){prepareImport(data,"merge",plan);return}
+  modal("Résoudre les positions cartographiques",`<div class="errorbox">${conflicts.length} position(s) diffèrent entre les deux documents.</div>${conflicts.map((c,i)=>`<div class="listitem"><b>${esc(currentView.equipments.find(e=>e.id===c.id)?.name||c.id)} · ${esc(c.format)}</b><br><span class="muted">Courante : ${c.current.x}, ${c.current.y} · Importée : ${c.imported.x}, ${c.imported.y}</span><div class="field"><label>Position retenue</label><select name="position-${i}" required><option value="">— Décision obligatoire —</option><option value="current">Position courante</option><option value="imported">Position importée</option></select></div></div>`).join("")}`,fd=>{plan.positionChoices=conflicts.map((c,i)=>({format:c.format,id:c.id,choice:fd.get(`position-${i}`)}));setTimeout(()=>prepareImport(data,"merge",plan),0)},{submit:"Continuer"})
 }
 function confirmImportBackup(data,mode,plan=null){
   try{download(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-avant-import.json`)}
@@ -581,12 +586,16 @@ function chooseImportDestination(data,mode,plan=null){
   if(!fileHandle){finalizeImport(data,mode,"detached",plan);return}
   modal("Destination du document importé",`<p>Un fichier local est actuellement associé à l'application. Choisissez la destination avant toute écriture.</p><div class="field"><label>Destination</label><select name="destination"><option value="current">Écrire dans le fichier actuellement ouvert</option><option value="new">Enregistrer dans un nouveau fichier</option><option value="detached">Détacher le fichier et travailler sans sauvegarde directe</option></select></div>`,fd=>setTimeout(()=>finalizeImport(data,mode,fd.get("destination"),plan),0),{submit:"Appliquer"})
 }
+function applyReplacementPlan(doc,plan){
+  if(!plan?.replaceCurrent?.length)return doc;const remap=new Map();for(const x of plan.replaceCurrent){doc[x.key]=doc[x.key].filter(item=>item.id!==x.currentId);remap.set(x.currentId,x.incomingId)}return remapDocumentRelations(doc,remap)
+}
 function buildImportCandidate(data,mode,plan=null){
   if(mode==="replace")return clone(data);
   const candidate=clone(state),before=clone(state),incoming=clone(data);
-  if(plan?.replaceCurrent?.length){const remap=new Map();for(const x of plan.replaceCurrent){candidate[x.key]=candidate[x.key].filter(item=>item.id!==x.currentId);remap.set(x.currentId,x.incomingId)}remapDocumentRelations(candidate,remap)}
+  applyReplacementPlan(candidate,plan);
   for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const target=candidate[key],existing=new Map(target.map((x,i)=>[x.id,i]));for(const x of incoming[key]||[]){const at=existing.get(x.id);if(at!==undefined){target[at]=clone(x);continue}let c=clone(x);if("name"in c){const scope=y=>key==="services"?y.equipmentId===c.equipmentId:key==="vlans"?y.zoneId===c.zoneId:true;if(target.some(y=>scope(y)&&norm(y.name)===norm(c.name)))c.name=nextName(c.name,target,scope)}target.push(c)}}
-  for(const format of ["desktop","tablet","phone"])for(const [id,pos] of Object.entries(incoming.positions?.[format]||{}))if(!candidate.positions[format][id])candidate.positions[format][id]=clone(pos);
+  const importedPositions=new Set((plan?.positionChoices||[]).filter(x=>x.choice==="imported").map(x=>`${x.format}/${x.id}`));
+  for(const format of ["desktop","tablet","phone"])for(const [id,pos] of Object.entries(incoming.positions?.[format]||{}))if(!candidate.positions[format][id]||importedPositions.has(`${format}/${id}`))candidate.positions[format][id]=clone(pos);
   candidate.document.revision++;candidate.document.parentHash=hashText(JSON.stringify(before));candidate.document.updatedAt=now();return validateImport(candidate)
 }
 function publishImport(candidate,mode,backup,handle=null){
