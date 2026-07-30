@@ -689,6 +689,14 @@ Première tranche de fusion avancée — conflits de même UUID :
 - Le candidat fusionné est entièrement revalidé avant sauvegarde ou publication ; une relation devenue invalide annule toute la fusion.
 - Les collisions métier entre UUID différents, le remappage d'import et l'union déterministe des historiques restent à traiter dans les tranches suivantes.
 
+Deuxième tranche de fusion avancée — union des historiques :
+- Pour un conflit de même UUID concernant un équipement ou un service, les historiques courant et importé sont désormais réunis quelle que soit la donnée principale retenue.
+- Les événements strictement identiques par date, ancien statut, nouveau statut et pseudo sont dédupliqués indépendamment de leur UUID d'événement.
+- Les contenus des événements conservés ne sont pas modifiés.
+- Le tri utilise successivement la date effective, `originDocumentUUID` et l'UUID d'événement.
+- Si le dernier événement fusionné ne correspond pas au statut finalement retenu, un nouvel événement « résolution de fusion » est ajouté avec le pseudo courant.
+- Le candidat complet est ensuite soumis à la validation qui impose la cohérence entre son dernier événement et son statut courant.
+
 Recette Edge complémentaire :
 - Une capture réelle a été produite avec Microsoft Edge en mode headless à la résolution 1 440 × 1 000.
 - Le tableau de bord, la navigation, les compteurs initiaux et la fenêtre obligatoire « Nouvel utilisateur » sont rendus correctement.
@@ -747,6 +755,7 @@ Prochain lot recommandé :
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
 - Ajouter ensuite la détection et la résolution des collisions métier entre UUID différents, avec remappage des relations.
+- Signaler visuellement les dates d'événement importées situées dans le futur sans modifier ces événements immuables.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :

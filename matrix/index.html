@@ -498,11 +498,20 @@ function prepareMergeInput(data){
   }
   return{prepared,conflicts}
 }
+function unionStatusHistory(current,incoming,status){
+  const events=[],seen=new Set();for(const h of [...(current.history||[]),...(incoming.history||[])]){const key=JSON.stringify([h.occurredAt,h.oldStatus,h.newStatus,h.pseudo]);if(!seen.has(key)){seen.add(key);events.push(clone(h))}}
+  events.sort((a,b)=>String(a.occurredAt).localeCompare(String(b.occurredAt))||String(a.originDocumentUUID||"").localeCompare(String(b.originDocumentUUID||""))||String(a.id).localeCompare(String(b.id)));
+  const last=events.at(-1)?.newStatus||null;if(last!==status)events.push(historyEntry(last,status,"résolution de fusion"));return events
+}
 function resolveMergeInput(data){
   const analysis=prepareMergeInput(data);if(!analysis.conflicts.length){prepareImport(analysis.prepared,"merge");return}
   const labels={zones:"zone",vlans:"VLAN",equipmentTypes:"type d'équipement",serviceTypes:"type de service",protocols:"protocole",knownPorts:"port connu",users:"utilisateur",equipments:"équipement",services:"service",flows:"flux"};
   modal("Résoudre les conflits d'UUID",`<div class="errorbox">${analysis.conflicts.length} élément(s) portent le même UUID avec un contenu différent. Chaque décision est obligatoire.</div><div class="field"><label>Appliquer à tous</label><select id="bulkConflict"><option value="">— Choisir individuellement —</option><option value="current">Conserver les données courantes</option><option value="imported">Utiliser les données importées</option></select></div>${analysis.conflicts.map((c,i)=>`<div class="listitem"><b>${esc(labels[c.key]||c.key)} · ${esc(c.current.name||c.current.pseudo||c.id)}</b><br><span class="muted">UUID ${esc(c.id)}</span><div class="field"><label>Décision</label><select name="conflict-${i}" data-conflict-choice required><option value="">— Décision obligatoire —</option><option value="current">Conserver la donnée courante</option><option value="imported">Utiliser la donnée importée</option></select></div></div>`).join("")}`,fd=>{
-    analysis.conflicts.forEach((c,i)=>{if(fd.get(`conflict-${i}`)==="current")analysis.prepared[c.key]=analysis.prepared[c.key].filter(x=>x.id!==c.id)});
+    analysis.conflicts.forEach((c,i)=>{
+      const choice=fd.get(`conflict-${i}`),hasHistory=["equipments","services"].includes(c.key),resolved=clone(choice==="current"?c.current:c.incoming);
+      if(hasHistory)resolved.history=unionStatusHistory(c.current,c.incoming,resolved.status);
+      if(choice==="current"&&!hasHistory)analysis.prepared[c.key]=analysis.prepared[c.key].filter(x=>x.id!==c.id);else analysis.prepared[c.key]=analysis.prepared[c.key].map(x=>x.id===c.id?resolved:x)
+    });
     setTimeout(()=>prepareImport(analysis.prepared,"merge"),0)
   },{submit:"Continuer"});$("#bulkConflict").onchange=e=>{$$("[data-conflict-choice]",$("#modalBody")).forEach(s=>s.value=e.target.value)}
 }
