@@ -715,6 +715,18 @@ Lot cartographique poursuivi — zoom et panoramique :
 - Le cadrage reste exclu du document métier exporté, conformément à la séparation entre préférences d'interface et données.
 - Les filtres disposent désormais d'un libellé de réinitialisation distinct du bouton de recadrage.
 
+Lot cartographique poursuivi — déplacement manuel :
+- Un équipement peut être déplacé directement par glisser-déplacer sans empêcher l'ouverture de ses services.
+- Les coordonnées du pointeur sont converties dans le repère SVG, y compris après zoom ou panoramique.
+- La position n'est enregistrée qu'à la fin d'un déplacement dépassant le seuil de clic.
+- Chaque déplacement constitue une transaction métier unique, incrémente une seule fois la révision et reste couvert par la récupération locale.
+- Les positions sont enregistrées dans le document séparément pour les formats ordinateur, tablette et téléphone.
+- Les flux sont recalculés sur les nouvelles coordonnées lors du rendu suivant.
+- La validation d'import contrôle les coordonnées et refuse les positions rattachées à un équipement inexistant.
+- La suppression d'un équipement retire ses positions dans les trois formats.
+- La création d'une copie indépendante remappe les clés de position vers les nouveaux UUID d'équipement.
+- La fiche d'un équipement déplacé propose de rétablir uniquement sa position automatique dans le format d'écran courant.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
@@ -767,7 +779,6 @@ Prochain lot recommandé :
 - Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
 - Préparer la fusion avancée sous forme de fonctions pures : analyse des conflits, décisions, remappage puis validation atomique.
 - Ajouter ensuite la détection et la résolution des collisions métier entre UUID différents, avec remappage des relations.
-- Ajouter le déplacement manuel des nœuds avec positions persistées dans le document par format d'écran.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :
