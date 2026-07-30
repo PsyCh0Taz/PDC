@@ -303,12 +303,14 @@ Persistance locale :
 - Plusieurs copies de récupération peuvent être conservées et sont indexées par UUID de document.
 - Une seule copie de récupération, la plus récente, est conservée pour chaque UUID de document.
 - Plusieurs récupérations peuvent donc coexister uniquement pour des documents différents.
-- Au démarrage, avant même l'ouverture d'un document, l'application affiche les récupérations disponibles avec le nom du document, leur date, leur révision et leur origine.
-- L'utilisateur choisit la récupération à examiner, à ignorer ou à supprimer.
+- Au démarrage ou après un rechargement de page, l'application valide puis restaure automatiquement la récupération locale la plus récemment modifiée.
+- Si la récupération la plus récente est invalide, l'application essaie la suivante sans publier de données invalides.
+- Après une restauration automatique, l'application affiche le message « rechargement du dernier contexte ».
+- Les autres récupérations restent disponibles dans la vue « Données » pour examen ou suppression.
 - Lorsqu'un document est déjà ouvert, une récupération n'est proposée pour celui-ci que si elle est différente et plus récente que sa dernière sauvegarde officielle.
-- Une copie de récupération n'est jamais restaurée silencieusement.
-- La restauration d'une récupération suit les mêmes contrôles de sécurité qu'un import.
-- Elle effectue, dans cet ordre, la migration éventuelle du schéma, la validation complète, l'affichage d'un aperçu, la création d'une sauvegarde de sécurité et le choix de la destination.
+- La restauration automatique au démarrage effectue la validation complète sans demander de confirmation.
+- Une restauration demandée manuellement depuis la vue « Données » demande une confirmation explicite.
+- Contrairement à un import manuel, elle ne crée et ne télécharge aucune sauvegarde JSON automatique du document remplacé.
 - Les données restaurées ne sont publiées en mémoire ou écrites dans un fichier qu'après la réussite de ces contrôles et décisions.
 - Une commande « Réinitialiser l'application » remet l'application dans son état initial après confirmation et création préalable d'un export de sécurité.
 - Elle efface les données chargées, toutes les copies de récupération gérées par l'application dans le profil du navigateur, les préférences locales, l'utilisateur courant mémorisé et la référence au fichier ouvert.
@@ -619,12 +621,19 @@ Lot de persistance réalisé le 30 juillet 2026 — récupérations locales :
 - Affichage pour chaque récupération du nom du document, de sa date, de sa révision et de son UUID.
 - Identification de la récupération correspondant au document courant.
 - Ajout d'une restauration avec confirmation explicite.
-- Avant toute restauration, téléchargement automatique d'une sauvegarde JSON du document courant.
+- La restauration ne télécharge plus de sauvegarde JSON automatique du document courant.
 - Validation minimale du document récupéré avant son remplacement.
 - Après restauration, réinitialisation de l'utilisateur courant, du descripteur de fichier et de la référence externe afin d'éviter d'écrire dans l'ancien fichier.
 - Possibilité d'annuler la restauration via le mécanisme d'annulation destructive existant.
 - Ajout de la suppression ciblée d'une récupération avec confirmation, sans effacer toutes les autres copies locales.
 - Ajout d'un message explicite lorsque la récupération demandée a disparu ou est invalide.
+
+Lot de persistance poursuivi le 30 juillet 2026 — reprise après rechargement :
+- Au chargement de la page, les récupérations sont classées par date de modification décroissante.
+- La récupération valide la plus récente est restaurée avant la sélection de l'utilisateur courant.
+- Une récupération invalide est ignorée au profit de la suivante, sans publier son contenu.
+- Le message « rechargement du dernier contexte » confirme la reprise automatique.
+- La reprise détache toute ancienne référence de fichier et ne déclenche ni téléchargement ni sauvegarde automatique.
 
 Lot de persistance poursuivi le 30 juillet 2026 — validation d'intégrité des imports :
 - Remplacement de la validation minimale par une validation globale exécutée avant toute proposition de remplacement ou de fusion.
@@ -791,6 +800,22 @@ Correctif des fenêtres modales :
 - Une fenêtre contenant des champs obligatoires vides peut donc être fermée sans déclencher la validation native du formulaire.
 - Les fenêtres explicitement obligatoires continuent de masquer ces deux commandes.
 
+Code couleur des statuts :
+- `ONLINE` est affiché en vert, `OFFLINE` en gris, `PENDING` en orange et `CRASHED` en rouge.
+- Les badges utilisent désormais un contour et un fond légèrement teinté en complément du texte et du point.
+- Sur la cartographie, le contour et le fond des équipements reprennent leur statut.
+- Les libellés des services cartographiques utilisent la couleur de leur propre statut, indépendamment de celui de l'équipement.
+- Les libellés accessibles de la carte annoncent également le statut.
+
+Directions et couleurs des flux cartographiques :
+- Les flux OK « local vers distant » sont bleus, « distant vers local » violets et bidirectionnels turquoise.
+- Les flux DRAFT restent rouges et pointillés, conformément à leur état technique prioritaire.
+- Les pointes de flèche reprennent la couleur de leur liaison.
+- Les flèches sont maintenant visibles sur un flux DRAFT dès que son sens est connu.
+- Un symbole `→`, `←`, `↔` ou `?` est affiché au centre de chaque connexion, y compris lorsqu'elle regroupe plusieurs flux.
+- Une légende textuelle et colorée rappelle les trois sens et le style DRAFT au-dessus de la carte.
+- Le libellé accessible de chaque connexion annonce les services reliés et le symbole de direction.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Dernier comptage statique équilibré : 1 218 accolades ouvrantes et fermantes, 2 690 parenthèses ouvrantes et fermantes, 445 crochets ouvrants et fermants.
@@ -819,7 +844,7 @@ Recette manuelle prioritaire à effectuer sur l'autre poste :
 11. Ouvrir les fiches d'un équipement et d'un service depuis la carte à la souris et au clavier.
 12. Depuis une connexion regroupée, ouvrir chaque flux puis annuler le formulaire.
 13. Modifier un document, attendre la copie automatique, puis vérifier sa présence dans « Données > Récupérations locales ».
-14. Restaurer une récupération et vérifier qu'une sauvegarde JSON du document remplacé est téléchargée.
+14. Restaurer une récupération et vérifier qu'aucun téléchargement de sauvegarde n'est déclenché.
 15. Vérifier le contenu restauré, la nouvelle sélection d'utilisateur et la possibilité d'annuler la restauration.
 16. Supprimer une seule récupération et vérifier que les autres restent disponibles.
 
