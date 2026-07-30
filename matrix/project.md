@@ -638,11 +638,38 @@ Lot de persistance poursuivi le 30 juillet 2026 — validation d'intégrité des
 - Ajout d'un message distinct lorsque la lecture du fichier sélectionné échoue.
 - La restauration IndexedDB réutilise automatiquement la même validation complète.
 
+Sous-lot suivant — aperçu et sauvegarde avant import :
+- Après validation, le choix du mode n'applique plus immédiatement l'import.
+- Un aperçu obligatoire récapitule le document, son UUID, sa révision et les volumes d'utilisateurs, zones, VLAN, équipements, services et flux.
+- L'aperçu explique distinctement l'effet du remplacement total et les limites de la fusion additive actuelle.
+- La sauvegarde JSON de sécurité est désormais créée avant un remplacement comme avant une fusion.
+- L'utilisateur doit confirmer explicitement que le téléchargement de cette sauvegarde a réussi avant que l'état candidat soit publié.
+- Une annulation à l'étape de l'aperçu ou de la confirmation laisse le document courant inchangé.
+- Après un remplacement, l'éventuel descripteur de fichier précédemment ouvert est détaché afin d'éviter une écriture ultérieure dans l'ancien fichier.
+
+Sous-lot suivant — destination atomique de l'import :
+- Lorsqu'un fichier local est déjà associé, l'utilisateur choisit explicitement entre le fichier courant, un nouveau fichier et un travail détaché.
+- Le remplacement ou la fusion est d'abord construit intégralement dans une copie en mémoire.
+- Pour une destination en écriture directe, cette copie candidate est écrite et le flux est fermé avant toute publication dans l'interface.
+- Une annulation du sélecteur de fichier ou un échec d'écriture conserve intégralement le document courant et son association de fichier.
+- Une écriture réussie publie ensuite l'état candidat, conserve le nouveau descripteur et initialise la référence externe sur le contenu effectivement écrit.
+- Le mode détaché publie l'état candidat comme non sauvegardé et supprime toute association avec l'ancien fichier.
+- La fusion candidate conserve la lignée courante et n'incrémente la révision qu'une seule fois.
+
+Sous-lot suivant — divergence du fichier externe :
+- Avant de réécrire un fichier déjà associé, l'application relit son contenu et compare son empreinte à celle du dernier état effectivement écrit.
+- Une divergence suspend l'écriture et affiche explicitement l'état « Conflit externe ».
+- L'utilisateur peut recharger un document externe valide via le parcours sécurisé d'aperçu et de sauvegarde, confirmer l'écrasement par la version courante ou enregistrer la version courante dans un nouveau fichier.
+- Un contenu externe invalide ne peut pas être rechargé, mais peut être écrasé explicitement ou contourné par un nouvel enregistrement.
+- Le choix « nouveau fichier » n'abandonne l'ancien descripteur qu'après la réussite du nouvel enregistrement.
+- L'écriture d'un état candidat d'import dans le fichier courant est également refusée si une divergence est détectée entre-temps.
+
 Vérifications de ce lot :
 - `git diff --check` ne signale aucune erreur de whitespace.
 - Comptage statique équilibré : 969 accolades ouvrantes et fermantes, 2 135 parenthèses ouvrantes et fermantes, 314 crochets ouvrants et fermants.
 - Le lancement headless Edge s'est terminé avec un code de sortie nul, mais n'a retourné aucun DOM exploitable dans cette session ; cette vérification reste donc à refaire visuellement.
 - La recette avec des fichiers JSON valides et volontairement corrompus reste à effectuer dans un navigateur normal.
+- Le parcours aperçu, téléchargement, annulation et confirmation doit également être inclus dans cette recette.
 
 Vérifications du dernier lot :
 - Comptage statique équilibré des accolades, parenthèses et crochets dans `index.html`.
@@ -685,7 +712,9 @@ Prochain lot recommandé :
 - Terminer la stabilisation cartographique par la recette ci-dessus et corriger les éventuels défauts de rendu ou de navigation.
 - Effectuer la recette des récupérations locales sur Edge et Firefox.
 - Effectuer la recette d'import avec un export valide, puis des documents altérés couvrant chaque famille d'anomalies, et compléter les contrôles selon les défauts observés.
-- Poursuivre la persistance avec l'aperçu obligatoire, la confirmation de sauvegarde de sécurité et le choix de destination avant publication de l'état candidat.
+- Vérifier le choix de destination avec une écriture réussie, une annulation du sélecteur et un échec d'écriture simulé.
+- Vérifier les trois résolutions de divergence avec une modification externe réelle du fichier associé.
+- Poursuivre avec les migrations de schéma dans un lot versionné et testable.
 - Traiter ensuite la fusion avancée comme un lot séparé, avec des fonctions testables hors interface.
 
 Procédure de passage d'un poste à l'autre :

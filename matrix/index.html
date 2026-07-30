@@ -433,7 +433,18 @@ function safeName(v){return(v||"matrix").replace(/[^\p{L}\p{N}_.-]+/gu,"-")}
 function exportPayload(){return clone(state)}
 function download(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function exportJson(){download(new Blob([JSON.stringify(exportPayload(),null,2)],{type:"application/json"}),`${safeName(state.document.name)}.json`);dirty=false;setSave("Exporté");toast("Export total créé.","ok")}
-async function saveDirect(){try{setSave("Enregistrement");if(!fileHandle)fileHandle=await showSaveFilePicker({suggestedName:`${safeName(state.document.name)}.json`,types:[{description:"Document Matrix",accept:{"application/json":[".json"]}}]});const w=await fileHandle.createWritable();await w.write(JSON.stringify(exportPayload(),null,2));await w.close();dirty=false;lastExternal={id:state.document.id,revision:state.document.revision,hash:hashText(JSON.stringify(state))};setSave("Enregistré");toast("Fichier enregistré.","ok")}catch(e){setSave("Échec");if(e.name!=="AbortError")toast(e.message,"error")}}
+async function externalSnapshot(handle){const file=await handle.getFile(),text=await file.text();return{file,text,hash:hashText(text)}}
+function resolveExternalDivergence(snapshot){
+  let external=null;try{external=validateImport(JSON.parse(snapshot.text))}catch{}
+  modal("Le fichier a été modifié ailleurs",`<div class="errorbox">L'écriture automatique est suspendue : le contenu du fichier associé ne correspond plus au dernier état connu.</div><div class="field"><label>Résolution</label><select name="resolution">${external?'<option value="reload">Recharger la version externe</option>':""}<option value="overwrite">Écraser explicitement avec la version courante</option><option value="new">Enregistrer la version courante dans un nouveau fichier</option></select></div>${external?"":'<p>La version externe ne constitue pas un document Matrix valide et ne peut pas être rechargée.</p>'}`,fd=>{const choice=fd.get("resolution");setTimeout(()=>{if(choice==="reload")prepareImport(external,"replace");else saveDirect(choice==="overwrite",choice==="new")},0)},{submit:"Continuer"})
+}
+async function saveDirect(forceOverwrite=false,saveAs=false){
+  try{
+    let handle=saveAs?null:fileHandle;
+    if(handle&&lastExternal&&!forceOverwrite){const snapshot=await externalSnapshot(handle);if(snapshot.hash!==lastExternal.hash){setSave("Conflit externe");resolveExternalDivergence(snapshot);return}}
+    setSave("Enregistrement");if(!handle)handle=await showSaveFilePicker({suggestedName:`${safeName(state.document.name)}.json`,types:[{description:"Document Matrix",accept:{"application/json":[".json"]}}]});const text=JSON.stringify(exportPayload(),null,2),w=await handle.createWritable();await w.write(text);await w.close();fileHandle=handle;dirty=false;lastExternal={id:state.document.id,revision:state.document.revision,hash:hashText(text)};setSave("Enregistré");toast("Fichier enregistré.","ok")
+  }catch(e){setSave(fileHandle?"Enregistré":"Échec");if(e.name!=="AbortError")toast(e.message,"error")}
+}
 function validateImport(d){
   const errors=[],add=(path,message)=>{if(errors.length<100)errors.push(`${path} : ${message}`)},obj=v=>v&&typeof v==="object"&&!Array.isArray(v),text=v=>typeof v==="string"&&v.trim(),iso=v=>typeof v==="string"&&!Number.isNaN(Date.parse(v));
   if(!obj(d))throw Error("Le fichier n'est pas un objet JSON.");
@@ -461,14 +472,41 @@ function validateImport(d){
   if(errors.length){const e=Error(`${errors.length}${errors.length===100?" ou plus":""} anomalie(s) détectée(s).`);e.validationErrors=errors;throw e}return d
 }
 function showImportError(e){if(!e.validationErrors){toast(e.message||String(e),"error");return}modal("Import refusé",`<div class="errorbox"><b>${esc(e.message)}</b></div><p>Le document courant n'a pas été modifié.</p><ol>${e.validationErrors.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>`,null,{hideSubmit:true})}
-function importFile(file){const r=new FileReader();r.onload=()=>{try{const data=validateImport(JSON.parse(r.result));modal("Importer le document total",`<p><b>${esc(data.document.name)}</b></p><p>${data.equipments.length} équipements · ${data.services.length} services · ${data.flows.length} flux</p><div class="field"><label>Mode</label><select name="mode"><option value="replace">Remplacement total</option><option value="merge">Fusion</option></select></div>`,fd=>{const mode=fd.get("mode");if(mode==="replace")replaceImport(data);else mergeImport(data)},{submit:"Importer"})}catch(e){showImportError(e)}};r.onerror=()=>toast("Impossible de lire le fichier sélectionné.","error");r.readAsText(file)}
-function replaceImport(data){const backup=clone(state);download(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-securite.json`);state=clone(data);currentUserId=null;undoState={label:"remplacement total",state:backup};dirty=true;scheduleRecovery();render();ensureUser();toast("Document remplacé.","ok")}
-function mergeImport(data){
-  const incoming=clone(data),backup=clone(state);
-  transact("Fusion appliquée",()=>{
-    for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const target=state[key],existing=new Set(target.map(x=>x.id));for(const x of incoming[key]||[]){if(!existing.has(x.id)){let c=clone(x);if("name"in c){const scope=y=>key==="services"?y.equipmentId===c.equipmentId:key==="vlans"?y.zoneId===c.zoneId:true;if(target.some(y=>scope(y)&&norm(y.name)===norm(c.name)))c.name=nextName(c.name,target,scope)}target.push(c)}}}
-  },{destructive:true});undoState={label:"fusion",state:backup};
+function importPreview(data,mode){
+  const rows=[["Document",data.document.name],["UUID",data.document.id],["Révision",data.document.revision],["Utilisateurs",data.users.length],["Zones / VLAN",`${data.zones.length} / ${data.vlans.length}`],["Équipements",data.equipments.length],["Services",data.services.length],["Flux",data.flows.length]];
+  return`<div class="errorbox"><b>${mode==="replace"?"Remplacement total":"Fusion additive"}</b><br>${mode==="replace"?"Toutes les données courantes seront remplacées.":"Les éléments importés absents du document courant seront ajoutés ; les conflits avancés ne sont pas encore résolus."}</div><dl>${rows.map(([k,v])=>`<dt><b>${esc(k)}</b></dt><dd>${esc(v)}</dd>`).join("")}</dl><p>Une sauvegarde JSON du document courant devra être téléchargée et confirmée avant l'application.</p>`
 }
+function prepareImport(data,mode){modal("Aperçu avant import",importPreview(data,mode),()=>setTimeout(()=>confirmImportBackup(data,mode),0),{submit:"Créer la sauvegarde"})}
+function confirmImportBackup(data,mode){
+  try{download(new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-avant-import.json`)}
+  catch(e){toast("La sauvegarde de sécurité n'a pas pu être créée. Import annulé.","error");return}
+  modal("Confirmer la sauvegarde",`<p>La sauvegarde JSON du document courant a été proposée au téléchargement.</p><label><input type="checkbox" name="backupConfirmed" value="yes" required> J'ai vérifié que la sauvegarde a bien été téléchargée.</label><p class="muted">Sans cette confirmation, aucune donnée ne sera modifiée.</p>`,fd=>{if(fd.get("backupConfirmed")!=="yes")throw Error("Confirmez le téléchargement de la sauvegarde.");setTimeout(()=>chooseImportDestination(data,mode),0)},{submit:"Continuer"})
+}
+function importFile(file){const r=new FileReader();r.onload=()=>{try{const data=validateImport(JSON.parse(r.result));modal("Importer le document total",`<p><b>${esc(data.document.name)}</b></p><p>${data.equipments.length} équipements · ${data.services.length} services · ${data.flows.length} flux</p><div class="field"><label>Mode</label><select name="mode"><option value="replace">Remplacement total</option><option value="merge">Fusion</option></select></div>`,fd=>{const mode=fd.get("mode");setTimeout(()=>prepareImport(data,mode),0)},{submit:"Afficher l'aperçu"})}catch(e){showImportError(e)}};r.onerror=()=>toast("Impossible de lire le fichier sélectionné.","error");r.readAsText(file)}
+function chooseImportDestination(data,mode){
+  if(!fileHandle){finalizeImport(data,mode,"detached");return}
+  modal("Destination du document importé",`<p>Un fichier local est actuellement associé à l'application. Choisissez la destination avant toute écriture.</p><div class="field"><label>Destination</label><select name="destination"><option value="current">Écrire dans le fichier actuellement ouvert</option><option value="new">Enregistrer dans un nouveau fichier</option><option value="detached">Détacher le fichier et travailler sans sauvegarde directe</option></select></div>`,fd=>setTimeout(()=>finalizeImport(data,mode,fd.get("destination")),0),{submit:"Appliquer"})
+}
+function buildImportCandidate(data,mode){
+  if(mode==="replace")return clone(data);
+  const candidate=clone(state),before=clone(state),incoming=clone(data);
+  for(const key of ["zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","users","equipments","services","flows"]){const target=candidate[key],existing=new Set(target.map(x=>x.id));for(const x of incoming[key]||[]){if(!existing.has(x.id)){let c=clone(x);if("name"in c){const scope=y=>key==="services"?y.equipmentId===c.equipmentId:key==="vlans"?y.zoneId===c.zoneId:true;if(target.some(y=>scope(y)&&norm(y.name)===norm(c.name)))c.name=nextName(c.name,target,scope)}target.push(c)}}}
+  candidate.document.revision++;candidate.document.parentHash=hashText(JSON.stringify(before));candidate.document.updatedAt=now();return candidate
+}
+function publishImport(candidate,mode,backup,handle=null){
+  state=candidate;currentUserId=null;fileHandle=handle;lastExternal=handle?{id:state.document.id,revision:state.document.revision,hash:hashText(JSON.stringify(state))}:null;undoState={label:mode==="replace"?"remplacement total":"fusion",state:backup};dirty=!handle;scheduleRecovery();render();setSave(handle?"Enregistré":"Non sauvegardé");ensureUser();toast(mode==="replace"?"Document remplacé.":"Fusion appliquée.","ok")
+}
+async function finalizeImport(data,mode,destination){
+  const backup=clone(state),candidate=buildImportCandidate(data,mode);
+  try{
+    if(destination==="detached"){publishImport(candidate,mode,backup,null);return}
+    let handle=fileHandle;if(destination==="new")handle=await showSaveFilePicker({suggestedName:`${safeName(candidate.document.name)}.json`,types:[{description:"Document Matrix",accept:{"application/json":[".json"]}}]});
+    if(destination==="current"&&lastExternal){const snapshot=await externalSnapshot(handle);if(snapshot.hash!==lastExternal.hash)throw Error("le fichier associé a été modifié ailleurs ; rechargez-le ou choisissez un nouveau fichier")}
+    setSave("Enregistrement");const w=await handle.createWritable();await w.write(JSON.stringify(candidate,null,2));await w.close();publishImport(candidate,mode,backup,handle)
+  }catch(e){setSave(fileHandle?"Enregistré":"Non sauvegardé");if(e.name!=="AbortError")toast("Import annulé, aucune donnée modifiée : "+e.message,"error")}
+}
+function replaceImport(data){finalizeImport(data,"replace","detached")}
+function mergeImport(data){finalizeImport(data,"merge","detached")}
 function regenerateIds(doc){const d=clone(doc),map=new Map();const collections=["users","zones","vlans","equipmentTypes","serviceTypes","protocols","knownPorts","equipments","services","flows"];for(const key of collections)for(const x of d[key])if(!x.builtin){const n=uid();map.set(x.id,n);x.id=n}for(const e of d.equipments){for(const i of e.interfaces){const ni=uid();map.set(i.id,ni);i.id=ni;for(const ip of i.ips){const n=uid();map.set(ip.id,n);ip.id=n}for(const dns of i.dns){const n=uid();map.set(dns.id,n);dns.id=n;dns.ipIds=(dns.ipIds||[]).map(x=>map.get(x)||x)}for(const h of e.history||[])h.id=uid()}}for(const s of d.services){s.equipmentId=map.get(s.equipmentId)||s.equipmentId;for(const l of s.listeners||[]){const old=l.id,n=uid();map.set(old,n);l.id=n;l.refId=map.get(l.refId)||l.refId}for(const h of s.history||[])h.id=uid()}for(const e of d.equipments){e.typeId=map.get(e.typeId)||e.typeId;e.zoneId=map.get(e.zoneId)||e.zoneId}for(const v of d.vlans)v.zoneId=map.get(v.zoneId)||v.zoneId;for(const p of d.knownPorts)p.protocolId=map.get(p.protocolId)||p.protocolId;for(const f of d.flows){f.protocolId=map.get(f.protocolId)||f.protocolId;f.endpoints.forEach(ep=>{ep.serviceId=map.get(ep.serviceId)||ep.serviceId;ep.listenerId=map.get(ep.listenerId)||ep.listenerId})}d.document.id=uid();d.document.revision=0;d.document.parentHash=null;return d}
 function createIndependentCopy(){confirmAction("Créer une copie indépendante","Tous les UUID métier seront renouvelés.",()=>{state=regenerateIds(state);currentUserId=null;fileHandle=null;lastExternal=null;dirty=true;scheduleRecovery();render();ensureUser();toast("Copie indépendante créée.","ok")})}
 function resetApplication(){const backup=clone(state);download(new Blob([JSON.stringify(backup,null,2)],{type:"application/json"}),`${safeName(state.document.name)}-securite.json`);confirmAction("Réinitialiser l'application","La sauvegarde de sécurité vient d'être téléchargée. Confirmez-vous la réinitialisation ?",()=>{state=newDocument();currentUserId=null;fileHandle=null;lastExternal=null;undoState=null;localStorage.removeItem("matrix:prefs");recoveryClear().finally(()=>{render();ensureUser();toast("Application réinitialisée.","ok")})})}
