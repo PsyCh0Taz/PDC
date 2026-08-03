@@ -6,10 +6,11 @@ CONTEXTE :
 - Je veux savoir :
     * Les équipements (0 à N équipements)
     * Les IP (0 à n IP)
-    * Les services ( 0 à n services )
+    * Les services autonomes, leurs protocoles et leurs ports (0 à n services)
+    * Les déploiements des services sur les équipements et interfaces
     * les flux : ( 0 à n flux ) :
-        * Le protocole de chaque flux (exactement 1 protocole, par exemple TCP ou UDP)
-        * Les ports et à quoi ils correspondent ( 0 à n ports ) : le n° et le type de flux avec un correction éventuelle ( le flux 1521 est normalement le port d'Oracle mais pourrait être utilisé par un autre service )
+        * Le protocole commun des services reliés (exactement 1 protocole, par exemple TCP ou UDP)
+        * Les ports définis par chaque service et leur usage réel
         * Le sens des flux
     * Une description pour chacun de ces éléments
 - Je veux une application dans une page HTML autonome
@@ -21,7 +22,7 @@ SPECIFICATIONS VALIDEES :
 Équipements :
 - Un équipement possède un nom, un type, une zone, un statut, un fabricant, un modèle et une description.
 - Un équipement possède zéro à plusieurs interfaces réseau.
-- Un équipement possède zéro à plusieurs services.
+- Un équipement possède zéro à plusieurs déploiements de services partagés.
 - Le statut d'un équipement est limité aux valeurs suivantes : ONLINE, OFFLINE, PENDING, CRASHED.
 - Le nom, le type, la zone et le statut sont obligatoires.
 - Le fabricant, le modèle et la description sont facultatifs.
@@ -37,17 +38,23 @@ Réseau :
 - Les noms DNS, les interfaces réseau et les VLAN sont gérés.
 
 Services :
-- Un service est toujours hébergé par un équipement précis.
-- Un service appartient à exactement un équipement.
-- Un service possède un nom, un type, une version, un statut et une description.
+- Un service est une définition métier autonome et peut être créé sans équipement.
+- Un service possède un nom unique, un type, un protocole, zéro à plusieurs ports ou plages de ports, une version, un statut et une description.
+- Le protocole et les ports appartiennent à la définition du service et sont communs à tous ses déploiements.
+- Un service peut être déployé sur zéro, un ou plusieurs équipements.
+- Un même service ne possède au maximum qu'un déploiement par équipement.
+- Chaque déploiement associe le service à exactement un équipement et à une interface de cet équipement.
+- La fiche du service présente la liste des équipements sous forme de cases à cocher et permet de choisir l'interface de chaque équipement coché.
+- La fiche de l'équipement permet également d'ajouter, modifier ou retirer un déploiement de service.
+- Retirer un service d'un équipement supprime uniquement ce déploiement ; la définition du service et ses autres déploiements sont conservés.
 - Le statut d'un service est limité aux valeurs suivantes : ONLINE, OFFLINE, PENDING, CRASHED.
-- Le nom, le type et le statut sont obligatoires.
+- Le nom, le type, le protocole et le statut sont obligatoires.
 - La version et la description sont facultatives.
 - Le statut par défaut est PENDING.
 - Le statut est renseigné manuellement ; l'application n'effectue aucun test automatique du service.
 - Chaque changement de statut est conservé dans un historique daté avec l'ancienne valeur, la nouvelle valeur et le pseudo déclaré de l'utilisateur.
-- Un service peut déclarer zéro à plusieurs points d'écoute parmi les interfaces, adresses IPv4, adresses IPv6 et noms DNS de son équipement.
-- Un point d'écoute ne peut référencer qu'un élément réseau appartenant à l'équipement qui héberge le service.
+- Chaque déploiement constitue un point d'écoute du service et référence l'interface choisie sur l'équipement concerné.
+- Un point d'écoute ne peut référencer qu'une interface appartenant à l'équipement de son déploiement.
 
 Historique des statuts :
 - À la création d'un équipement ou d'un service, une première entrée immuable « Aucun vers statut initial » est enregistrée.
@@ -79,33 +86,32 @@ Flux :
 - Un flux ne peut pas avoir pour extrémité une adresse ou un réseau externe non enregistré.
 - Les équipements externes sont enregistrés dans l'application et distingués des autres équipements par leur zone.
 - Le sens d'un flux peut aller du service local vers le service distant, du service distant vers le service local, ou être bidirectionnel.
-- Un flux utilise exactement un protocole, y compris à l'état DRAFT.
-- Pour chaque extrémité, un flux peut ne comporter aucun port renseigné ou comporter une expression mélangeant des ports individuels et des plages, par exemple « 80, 443, 8000-8010 ».
-- L'absence de port signifie « non renseigné » et non « tous les ports ».
-- Les ports sont définis séparément pour chacune des deux extrémités du flux.
-- Les expressions de ports du service local et du service distant sont indépendantes.
-- Il n'existe aucune correspondance positionnelle ou individuelle entre les ports des deux côtés.
-- Chaque extrémité du flux peut sélectionner facultativement un point d'écoute déclaré par son service.
-- L'absence de point d'écoute sélectionné signifie « non renseigné ».
-- Les ports peuvent être différents entre les deux équipements qui hébergent les services, afin de représenter notamment une traduction de ports.
+- Un flux utilise le protocole défini par ses services, y compris à l'état DRAFT.
+- Les deux services d'un flux complet doivent définir le même protocole.
+- Chaque extrémité sélectionne un déploiement précis sous la forme « équipement — service — interface ».
+- Le point d'écoute enregistré dans l'extrémité identifie ce déploiement sans ambiguïté, y compris lorsqu'un même service est présent sur plusieurs équipements.
+- Les ports d'une extrémité sont recopiés depuis la définition du service et ne sont pas modifiables dans le formulaire du flux.
+- Une modification des ports ou du protocole d'un service est propagée à ses flux liés.
+- Un changement de protocole est refusé s'il rendrait incompatibles deux services déjà reliés.
+- L'absence de port sur le service signifie « non renseigné » et non « tous les ports ».
 - Un flux possède une description.
 - Un flux ne possède pas de nom.
 - Un flux ne possède pas de statut.
 - Le terme « statut » est réservé aux équipements et aux services.
 - Pour un flux, le terme utilisé est exclusivement « état technique » avec les valeurs DRAFT et OK.
-- Au moins un service et exactement un protocole sont obligatoires pour enregistrer un flux.
+- Au moins un déploiement de service et son protocole sont obligatoires pour enregistrer un flux.
 - Les deux services et le sens sont obligatoires pour obtenir l'état OK.
-- Les ports et la description sont facultatifs.
+- Les ports du service et la description du flux sont facultatifs.
 - L'état technique d'un flux est calculé automatiquement : DRAFT ou OK.
-- Un flux est OK lorsque les deux services, le sens et le protocole sont présents et valides.
+- Un flux est OK lorsque les deux déploiements de service, le sens et le protocole commun sont présents et valides.
 - Un flux ayant un seul service ou aucun sens est automatiquement DRAFT.
 - Un flux possédant une dépendance supprimée ou une anomalie d'intégrité non acquittée est également DRAFT.
 - Si la modification d'un flux OK supprime le second service ou le sens, il redevient automatiquement DRAFT.
 - La suppression du dernier service ou du protocole est refusée, car un flux DRAFT enregistré exige toujours au moins un service et exactement un protocole valides.
 - Dès qu'un flux DRAFT possède de nouveau tous ses champs obligatoires valides et ne présente plus d'anomalie d'intégrité non acquittée, il devient automatiquement OK.
 - Après la suppression d'un point d'écoute utilisé, le flux concerné reste DRAFT jusqu'à ce que l'utilisateur sélectionne un nouveau point d'écoute ou confirme explicitement la valeur « non renseigné ».
-- Un numéro de port est un entier compris entre 1 et 65535.
-- Le port 0 est réservé et n'est pas accepté.
+- Un numéro de port est un entier compris entre 1 et 65535 ; la valeur spéciale `0` indique un port aléatoire ou non connu et ne peut pas être utilisée dans une plage.
+- La valeur spéciale `0` est acceptée seule et signifie « port aléatoire ou non connu ».
 - Dans une plage de ports, la borne de début est inférieure ou égale à la borne de fin.
 - Les doublons et les chevauchements sont automatiquement supprimés ou normalisés dans une expression de ports.
 - Les entrées de ports ou plages ayant le même usage réel peuvent être fusionnées lors de cette normalisation.
@@ -117,7 +123,7 @@ Flux :
 - Ces références représentent la réutilisation d'une seule ouverture logique du service, et non plusieurs ouvertures du même port.
 - Cette réutilisation est autorisée indépendamment de la position locale ou distante du service dans l'affichage du flux.
 - L'interdiction des doublons porte uniquement sur les flux dont toute la clé technique est identique.
-- Plusieurs flux peuvent relier les mêmes services s'ils diffèrent par le sens, le protocole, les points d'écoute ou les ports.
+- Plusieurs flux peuvent relier les mêmes services s'ils diffèrent par le sens ou les points d'écoute ; le protocole et les ports restent ceux des services.
 - La clé technique d'un flux contient les services, leurs points d'écoute, leurs ports normalisés, le protocole et le sens.
 - La description et les usages réels sont exclus de la clé technique.
 - Deux flux ayant la même clé technique sont interdits.
@@ -182,7 +188,8 @@ Vues :
 - Un nouvel équipement ou service est placé automatiquement sans chevauchement dans sa zone, puis peut être déplacé manuellement.
 
 Opérations :
-- La suppression d'un équipement entraîne, après confirmation, la suppression de ses interfaces, de ses services et de tous les flux liés à ces services.
+- La suppression d'un équipement entraîne, après confirmation, la suppression de ses interfaces, des déploiements de services présents sur cet équipement et des flux qui utilisent ces déploiements.
+- Les définitions de services partagées et leurs déploiements sur les autres équipements sont conservés.
 - La suppression d'un service entraîne, après confirmation, la suppression de tous les flux qui lui sont liés.
 - Les flux liés supprimés en cascade comprennent explicitement les flux OK et DRAFT.
 - Les positions et autres données cartographiques devenues orphelines sont également supprimées.
@@ -201,37 +208,25 @@ Opérations :
 - Avant la suppression d'une interface, d'une IP ou d'un nom DNS utilisé comme point d'écoute, l'application affiche les services et les flux affectés.
 - Après confirmation, les références devenues invalides sont retirées et les éléments affectés sont signalés.
 - Tout flux affecté par cette suppression passe à l'état DRAFT avec le motif « point d'écoute supprimé ».
-- Le retrait direct d'un point d'écoute depuis la fiche d'un service affiche également les flux affectés avant confirmation.
+- Le retrait d'un déploiement depuis la fiche du service ou de l'équipement affiche également les flux affectés avant confirmation.
 - Après confirmation, la référence est retirée des flux concernés, qui passent à l'état DRAFT avec un motif explicite.
 - Chaque flux reste DRAFT jusqu'à la sélection d'un nouveau point d'écoute ou à la confirmation explicite « non renseigné ».
 - Avant tout changement de zone d'un équipement, de mode accès/trunk ou de liste de VLAN, l'application affiche les interfaces, adresses, services et flux qui deviendraient invalides.
 - La modification est bloquée tant que les dépendances ne sont pas réaffectées ou explicitement retirées.
 - Après validation, tout flux dont le point d'écoute a été invalidé passe à l'état DRAFT avec un motif explicite.
 - L'application permet d'importer et d'exporter uniquement le document total contenant notamment les équipements, les services et les flux.
-- La duplication d'un équipement copie ses champs, ses interfaces et ses services ; son nom est numéroté automatiquement.
+- La duplication d'un équipement copie ses champs et ses interfaces ; son nom est numéroté automatiquement.
+- Chaque service déployé sur l'équipement original reçoit un nouveau déploiement sur l'interface correspondante du nouvel équipement, sans dupliquer sa définition métier.
 - Lors de la duplication d'un équipement, les interfaces sont copiées mais leurs adresses IPv4, IPv6, leurs adresses MAC et leurs noms DNS sont laissés vides.
-- Toutes les entités créées par cette duplication reçoivent de nouveaux UUID et de nouvelles dates de création et de modification.
+- L'équipement, ses interfaces, les nouveaux déploiements et les flux créés par cette duplication reçoivent de nouveaux UUID et de nouvelles dates de création et de modification.
 - Les historiques de statut ne sont pas copiés.
 - Les points d'écoute qui référencent directement une interface copiée sont remappés vers cette nouvelle interface.
 - Les points d'écoute qui référencent une IP ou un DNS vidé sont retirés de la copie.
-- Les flux copiés qui perdent ainsi un point d'écoute passent à l'état DRAFT jusqu'au choix d'un nouveau point ou à la confirmation explicite « non renseigné ».
+- Les flux utilisant un déploiement de l'équipement original sont copiés en remplaçant cette extrémité par le nouveau déploiement ; l'autre extrémité est conservée.
 - La duplication d'un service copie ses champs ; son nom est numéroté automatiquement.
-- Lorsque les deux services d'un flux sont copiés lors de la duplication d'un équipement, le flux est recréé intégralement entre les deux services copiés et conserve son état OK si toutes ses données restent valides.
-- Un auto-flux est recréé intégralement sur le service copié.
-- Un modèle incomplet est créé lorsque la duplication ne dispose que d'une seule extrémité de service à rattacher.
-- Ce cas se produit lorsqu'une seule extrémité d'un flux à deux services est copiée ou lorsque le flux d'origine est déjà un DRAFT à un seul service.
-- Ces modèles sont enregistrés avec l'état DRAFT et peuvent rester temporairement incomplets.
-- Pour chaque flux lié au service original, que celui-ci soit le service local, le service distant ou une extrémité d'un flux bidirectionnel, le flux DRAFT conserve le service dupliqué et les ports de son côté.
-- Le sens du flux, le service de l'autre côté et les ports de l'autre côté sont laissés vides dans le flux DRAFT.
-- Le protocole et la description d'origine sont conservés dans le flux DRAFT.
-- Si plusieurs modèles deviennent techniquement identiques à l'issue d'une duplication, avec ou sans port renseigné, un seul flux DRAFT est créé pour leur clé technique.
-- Ce flux DRAFT conserve pour chaque flux d'origine un instantané de son UUID, de sa description, de ses usages réels et du contexte de son autre extrémité.
-- Les champs principaux du DRAFT reprennent provisoirement ceux du premier flux d'origine selon l'ordre déterministe « date de création puis UUID ».
-- Une anomalie de regroupement maintient ce flux à l'état DRAFT tant que l'utilisateur n'a pas explicitement choisi ou fusionné les variantes de description et d'usages réels.
-- Un DRAFT regroupé constitue un groupe temporaire de contextes d'origine.
-- Son assistant de complétion permet de créer un flux distinct pour chaque contexte d'origine.
-- Dès que les clés techniques résultantes diffèrent, les flux sont enregistrés séparément à l'état DRAFT ou OK selon leur complétude.
-- Les contextes qui ne sont pas encore complétés restent dans le groupe DRAFT.
+- Lorsque les deux extrémités d'un flux appartiennent à l'équipement dupliqué, elles sont toutes les deux remappées vers le nouvel équipement.
+- Un auto-flux est recréé intégralement sur les nouveaux déploiements.
+- Lorsque seule une extrémité appartient à l'équipement dupliqué, le flux complet est copié entre le nouveau déploiement et l'extrémité distante existante.
 - Les contraintes exigeant deux services, un sens et un protocole s'appliquent à l'état OK.
 - Un flux DRAFT apparaît dans la liste des flux avec l'indicateur « DRAFT ».
 - Un flux DRAFT est inclus dans la cartographie avec un indicateur visuel spécifique.
@@ -572,7 +567,7 @@ SUIVI D'AVANCEMENT :
 Ce chapitre sert de point de reprise entre les deux postes de développement. Il doit être mis à jour à chaque lot significatif, avant le commit et le push Git.
 
 Dernière mise à jour :
-- Date : 30 juillet 2026.
+- Date : 3 août 2026.
 - Application : prototype autonome contenu dans `index.html`.
 - Version déclarée dans l'application : 0.1.0.
 - Version du schéma de données : 1.
@@ -583,10 +578,11 @@ Dernière mise à jour :
 État fonctionnel actuellement implémenté :
 - Document autonome sans serveur, thèmes clair et sombre et interface responsive.
 - Gestion des utilisateurs déclaratifs et sélection de l'utilisateur courant.
-- Création, modification, détail, duplication et suppression des équipements.
+- Création, modification, duplication et suppression des équipements depuis une fiche principale unique.
 - Gestion des interfaces réseau, adresses IPv4 et IPv6, MAC, DNS et modes VLAN accès ou trunk.
-- Création, modification, duplication et suppression des services et de leurs points d'écoute.
-- Création, modification, duplication et suppression des flux, calcul automatique DRAFT ou OK, validation et normalisation des expressions de ports et détection de doublons techniques.
+- Création, modification, duplication et suppression de services autonomes portant leur protocole et leurs ports.
+- Déploiement d'un même service sur plusieurs équipements et interfaces depuis la fiche du service ou celle de l'équipement.
+- Création, modification, duplication et suppression des flux entre deux déploiements précis, calcul automatique DRAFT ou OK et détection de doublons techniques.
 - Référentiels des zones, VLAN, types d'équipement, types de service, protocoles et ports connus.
 - Historique des changements de statut des équipements et services.
 - Suppressions en cascade principales et invalidation des flux lorsque leur point d'écoute disparaît.
@@ -848,11 +844,28 @@ Recette manuelle prioritaire à effectuer sur l'autre poste :
 15. Vérifier le contenu restauré, la nouvelle sélection d'utilisateur et la possibilité d'annuler la restauration.
 16. Supprimer une seule récupération et vérifier que les autres restent disponibles.
 
+Lot du 3 août 2026 — services partagés et cohérence des flux :
+- Les services sont désormais créés indépendamment des équipements.
+- Chaque service porte un protocole unique et une expression normalisée de ports commune à tous ses déploiements.
+- La valeur de port `0` représente un port aléatoire ou non connu et ne peut pas être incluse dans une plage.
+- La fiche du service liste les équipements avec une case à cocher et un choix d'interface.
+- Un même service peut être déployé sur plusieurs équipements, au maximum une fois par équipement.
+- La fiche principale d'un équipement permet également d'ajouter, configurer ou retirer un déploiement.
+- Les flux sélectionnent chaque extrémité par la combinaison équipement, service et interface.
+- Les ports et le protocole ne sont plus modifiables dans le formulaire du flux ; ils proviennent du service.
+- Une modification des ports du service est propagée aux flux liés ; un changement de protocole incompatible est refusé.
+- La duplication d'un équipement recrée ses déploiements sur les nouvelles interfaces et copie les flux en remappant les extrémités concernées.
+- La suppression d'un équipement conserve les définitions de services partagées et leurs déploiements sur les autres équipements.
+- Les boutons « Détails » des listes Équipements et Services ont été retirés au profit des fiches principales.
+- La dernière vue active est mémorisée par document et restaurée après un rechargement F5.
+- La cartographie adapte la taille des zones à leurs équipements, empêche leur superposition et permet de déplacer une zone par son titre.
+- Les infobulles des liaisons affichent équipement, service, ports, protocole, direction et état ; le tableau accessible inclut également DNS et ports.
+
 Limites et écarts connus par rapport aux spécifications :
 - La fusion gère les conflits de même UUID, les principales collisions métier, les remappages, les historiques et les positions, mais sa recette exhaustive avec des graphes conflictuels imbriqués reste à réaliser.
 - L'option de remappage d'import vers un nouvel UUID distinct de l'UUID importé n'est pas encore proposée séparément lorsque le simple renommage ne suffit pas.
 - Les migrations de schéma et de catalogue ne sont pas encore implémentées ; une version de schéma antérieure est donc refusée explicitement.
-- La cartographie permet zoom, panoramique et positions manuelles par format, mais la géométrie des zones reste automatique et ne s'agrandit pas autour des équipements déplacés hors de leur cadre initial.
+- La cartographie redimensionne les zones autour de leurs équipements et empêche leur superposition ; la recette visuelle exhaustive des déplacements reste à effectuer.
 - Les auto-flux sont dessinés sous forme de boucle, mais leur géométrie fixe doit être vérifiée en présence de nombreux services proches.
 - Les filtres cartographiques doivent être validés sur des jeux de données où les statuts de l'équipement et de ses services diffèrent.
 - Les impacts d'un changement de zone d'équipement restent bloqués lorsque des VLAN sont configurés ; aucun assistant de réaffectation groupée vers une nouvelle zone n'est encore disponible.
@@ -877,7 +890,7 @@ Procédure de passage d'un poste à l'autre :
 6. Après reprise, inscrire ici le nom de la branche et le hash du commit de départ.
 
 Informations Git relevées le 30 juillet 2026 :
-- Racine du dépôt : `D:\PDC\www`.
+- Racine du dépôt : `D:\PDC\www` ou `C:\Users\Taz\Documents\DEV\UwAmp_running\PDC\www\matrix`
 - Dépôt distant : `origin`, URL `https://github.com/PsyCh0Taz/PDC.git`.
 - Branche de travail : `main`.
 - Branche amont : `origin/main`.
