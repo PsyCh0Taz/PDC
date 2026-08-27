@@ -464,13 +464,14 @@ var PDC_USERS_STATE = {
     selectedUsername: null,
     selectedUsernames: {},
     selectedLevelIds: {},
+    copySourceUsername: '',
 };
 
 document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('users-list')) {
         loadUsers();
         initLdapUserSearch();
-        initBulkRights();
+        initUserRightsCopy();
     }
 
     initHierarchyLevelManagement();
@@ -761,7 +762,7 @@ function renderUsersList() {
             } else {
                 delete PDC_USERS_STATE.selectedUsernames[this.dataset.username];
             }
-            updateBulkRightsSummary();
+            updateCopyRightsControls();
         });
     });
 
@@ -792,11 +793,51 @@ function flattenHierarchy(nodes, depth, out) {
     });
 }
 
-function initBulkRights() {
+function initUserRightsCopy() {
     var selectAllUsers = document.getElementById('btn-select-all-users');
+    var descendantsOption = document.getElementById('bulk-include-descendants');
+    if (descendantsOption) {
+        var descendantsLabel = descendantsOption.closest('label');
+        if (descendantsLabel) descendantsLabel.remove();
+    }
+    ['bulk-rights-summary', 'bulk-role-select', 'btn-apply-bulk-role'].forEach(function(id) {
+        var obsoleteElement = document.getElementById(id);
+        if (obsoleteElement) obsoleteElement.remove();
+    });
     var selectAllLevels = document.getElementById('bulk-select-all-levels');
-    var applyButton = document.getElementById('btn-apply-bulk-role');
-    var includeDescendants = document.getElementById('bulk-include-descendants');
+    if (selectAllLevels) selectAllLevels.remove();
+    var toolbar = document.querySelector('.pdc-bulk-rights-toolbar');
+    var explanation = document.createElement('p');
+    explanation.className = 'mb-2';
+    explanation.textContent = 'Sélectionnez un utilisateur comme modèle puis les utilisateurs cibles pour copier les droits automatiquement';
+
+    var sourceLabel = document.createElement('label');
+    sourceLabel.htmlFor = 'copy-rights-source-user';
+    sourceLabel.className = 'form-label';
+    sourceLabel.textContent = 'Utilisateur modèle';
+
+    var sourceSelect = document.createElement('select');
+    sourceSelect.id = 'copy-rights-source-user';
+    sourceSelect.className = 'form-select';
+
+    var copyRightsButton = document.createElement('button');
+    copyRightsButton.type = 'button';
+    copyRightsButton.className = 'btn btn-outline-primary';
+    copyRightsButton.id = 'btn-copy-user-rights';
+    copyRightsButton.disabled = true;
+    copyRightsButton.textContent = 'Copier les droits';
+    copyRightsButton.title = 'Copier les droits hiérarchiques et le niveau de vue, sans modifier les droits admin';
+    if (toolbar) {
+        toolbar.appendChild(explanation);
+        toolbar.appendChild(sourceLabel);
+        toolbar.appendChild(sourceSelect);
+        toolbar.appendChild(copyRightsButton);
+    }
+
+    sourceSelect.addEventListener('change', function() {
+        PDC_USERS_STATE.copySourceUsername = this.value;
+        updateCopyRightsControls();
+    });
 
     if (selectAllUsers) {
         selectAllUsers.addEventListener('click', function() {
@@ -811,125 +852,73 @@ function initBulkRights() {
         });
     }
 
-    if (selectAllLevels) {
-        selectAllLevels.addEventListener('change', function() {
-            PDC_USERS_STATE.selectedLevelIds = {};
-            if (this.checked) {
-                var levels = [];
-                flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, levels);
-                levels.forEach(function(level) {
-                    PDC_USERS_STATE.selectedLevelIds[level.id] = true;
-                });
-            }
-            renderRolesMatrix();
-        });
-    }
-
-    if (applyButton) {
-        applyButton.addEventListener('click', applyBulkRights);
-    }
-
-    if (includeDescendants) {
-        includeDescendants.addEventListener('change', updateBulkRightsSummary);
-    }
+    copyRightsButton.addEventListener('click', copySelectedUserRights);
+    updateCopyRightsControls();
 }
 
-function getBulkLevelIds() {
-    var selected = PDC_USERS_STATE.selectedLevelIds;
-    var includeDescendants = document.getElementById('bulk-include-descendants');
-    var result = {};
-
-    function visit(nodes, inheritedSelection) {
-        nodes.forEach(function(node) {
-            var selectedHere = !!selected[node.id];
-            if (selectedHere || inheritedSelection) {
-                result[node.id] = true;
-            }
-            if (node.subItems && node.subItems.length) {
-                visit(node.subItems, (includeDescendants && includeDescendants.checked) ? (inheritedSelection || selectedHere) : false);
-            }
-        });
-    }
-
-    visit(PDC_USERS_STATE.hierarchie, false);
-    return Object.keys(result);
-}
-
-function updateBulkRightsSummary() {
-    var summary = document.getElementById('bulk-rights-summary');
-    var applyButton = document.getElementById('btn-apply-bulk-role');
-    if (!summary || !applyButton) {
-        return;
-    }
-
-    var userCount = Object.keys(PDC_USERS_STATE.selectedUsernames).length;
-    var levelCount = getBulkLevelIds().length;
-    var changeCount = userCount * levelCount;
-    var allLevels = [];
-    flattenHierarchy(PDC_USERS_STATE.hierarchie, 0, allLevels);
-    var rawLevelCount = Object.keys(PDC_USERS_STATE.selectedLevelIds).length;
-    var selectAllLevels = document.getElementById('bulk-select-all-levels');
+function updateCopyRightsControls() {
+    var copyRightsButton = document.getElementById('btn-copy-user-rights');
+    var sourceSelect = document.getElementById('copy-rights-source-user');
     var selectAllUsers = document.getElementById('btn-select-all-users');
-
-    if (selectAllLevels) {
-        selectAllLevels.checked = allLevels.length > 0 && rawLevelCount === allLevels.length;
-        selectAllLevels.indeterminate = rawLevelCount > 0 && rawLevelCount < allLevels.length;
-    }
+    var userCount = Object.keys(PDC_USERS_STATE.selectedUsernames).length;
     if (selectAllUsers) {
         selectAllUsers.textContent = userCount > 0 && userCount === PDC_USERS_STATE.users.length ? 'Tout désélectionner' : 'Tout sélectionner';
     }
-    summary.textContent = userCount + ' utilisateur(s), ' + levelCount + ' niveau(x), jusqu’à ' + changeCount + ' droit(s) concernés.';
-    applyButton.disabled = changeCount === 0;
+    if (sourceSelect) {
+        var selectedSource = PDC_USERS_STATE.copySourceUsername;
+        sourceSelect.innerHTML = '';
+        var placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Choisir un utilisateur modèle';
+        sourceSelect.appendChild(placeholder);
+        PDC_USERS_STATE.users.forEach(function(user) {
+            var option = document.createElement('option');
+            option.value = user.username;
+            option.textContent = (user.displayname || user.username) + ' (' + user.username + ')';
+            sourceSelect.appendChild(option);
+        });
+        sourceSelect.value = selectedSource;
+        if (sourceSelect.value !== selectedSource) {
+            PDC_USERS_STATE.copySourceUsername = '';
+        }
+    }
+    if (copyRightsButton) {
+        var destinationCount = Object.keys(PDC_USERS_STATE.selectedUsernames).filter(function(username) {
+            return username !== PDC_USERS_STATE.copySourceUsername;
+        }).length;
+        copyRightsButton.disabled = !PDC_USERS_STATE.copySourceUsername || destinationCount === 0;
+    }
 }
 
-function applyBulkRights() {
-    var usernames = Object.keys(PDC_USERS_STATE.selectedUsernames);
-    var levelIds = getBulkLevelIds();
-    var roleSelect = document.getElementById('bulk-role-select');
-    var applyButton = document.getElementById('btn-apply-bulk-role');
-    var role = roleSelect ? roleSelect.value : '';
-    var changeCount = usernames.length * levelIds.length;
+function copySelectedUserRights() {
+    var sourceUsername = PDC_USERS_STATE.copySourceUsername;
+    var targetUsernames = Object.keys(PDC_USERS_STATE.selectedUsernames).filter(function(username) {
+        return username !== sourceUsername;
+    });
+    var button = document.getElementById('btn-copy-user-rights');
 
-    if (!changeCount || !window.confirm('Appliquer le droit « ' + (role || 'Hérité') + ' » à ' + usernames.length + ' utilisateur(s) sur ' + levelIds.length + ' niveau(x) ?')) {
+    if (!sourceUsername || !targetUsernames.length) return;
+    if (!window.confirm('Remplacer les droits hiérarchiques et le niveau de vue de ' + targetUsernames.length + ' utilisateur(s) par ceux de « ' + sourceUsername + ' » ? Les droits admin resteront inchangés.')) {
         return;
     }
 
-    applyButton.disabled = true;
-    const formData = new FormData();
-    formData.append('action', 'set_bulk_user_scope_roles');
-    formData.append('usernames', JSON.stringify(usernames));
-    formData.append('level_ids', JSON.stringify(levelIds));
-    formData.append('role', role);
+    button.disabled = true;
+    var formData = new FormData();
+    formData.append('action', 'copy_user_rights');
+    formData.append('source_username', sourceUsername);
+    formData.append('target_usernames', JSON.stringify(targetUsernames));
 
-    fetch('<?php echo APP_URL; ?>/api.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            throw new Error(data.error || 'Erreur inconnue');
-        }
-        usernames.forEach(function(username) {
-            levelIds.forEach(function(levelId) {
-                var key = username + '::hierarchie:' + levelId;
-                if (role === '') {
-                    delete PDC_USERS_STATE.roles[key];
-                } else {
-                    PDC_USERS_STATE.roles[key] = [role];
-                }
-            });
+    fetch('<?php echo APP_URL; ?>/api.php', { method: 'POST', body: formData })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (!data.success) throw new Error(data.error || 'Erreur inconnue');
+            alert(data.updated_users + ' utilisateur(s) mis à jour.');
+            loadUsers();
+        })
+        .catch(function(error) {
+            alert('La copie des droits a échoué : ' + error.message);
+            updateCopyRightsControls();
         });
-        renderRolesMatrix();
-        alert(data.updated + ' droit(s) mis à jour.');
-    })
-    .catch(error => {
-        console.error('Erreur de mise à jour groupée:', error);
-        alert('La mise à jour groupée a échoué : ' + error.message);
-    })
-    .finally(function() {
-        updateBulkRightsSummary();
-    });
 }
 
 function getRoleForScope(username, scope) {
@@ -1061,16 +1050,9 @@ function renderRolesMatrix() {
     });
 
     document.querySelectorAll('.pdc-bulk-level-checkbox').forEach(function(checkbox) {
-        checkbox.addEventListener('change', function() {
-            if (this.checked) {
-                PDC_USERS_STATE.selectedLevelIds[this.dataset.levelId] = true;
-            } else {
-                delete PDC_USERS_STATE.selectedLevelIds[this.dataset.levelId];
-            }
-            updateBulkRightsSummary();
-        });
+        checkbox.remove();
     });
-    updateBulkRightsSummary();
+    updateCopyRightsControls();
 }
 
 function setUserGlobalAdmin(username, enabled, checkbox) {

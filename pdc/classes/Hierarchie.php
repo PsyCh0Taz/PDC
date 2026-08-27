@@ -341,7 +341,7 @@ class Hierarchie {
 
             // Nettoyage des droits associés à ce scope hiérarchique.
             $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE role_dn = ?', array('hierarchie:' . $levelId));
-            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = NULL WHERE niveau_id = ?', array($levelId));
+            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = 0 WHERE niveau_id = ?', array($levelId));
 
             return $db->execute('DELETE FROM pdc_hierarchie WHERE id = ?', array($levelId));
         }
@@ -356,7 +356,7 @@ class Hierarchie {
 
         foreach ($subtreeIds as $nodeId) {
             $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE role_dn = ?', array('hierarchie:' . (int)$nodeId));
-            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = NULL WHERE niveau_id = ?', array((int)$nodeId));
+            $db->execute('UPDATE pdc_utilisateurs SET niveau_id = 0 WHERE niveau_id = ?', array((int)$nodeId));
         }
 
         $deleted = 0;

@@ -13,12 +13,9 @@ $id     = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
 $viewHierarchy = Hierarchie::getViewTree($viewLevelId, false);
 
-if ($id > 0 && !Hierarchie::isInView($id, $viewLevelId)) {
-    $id = 0;
-}
-
 $tmpHierarchie=($id ? Hierarchie::getLevel($id) : $viewHierarchy);
-$tmpRevHierarchie=($id ? Hierarchie::getUpperLevel($viewHierarchy, $id) : null);
+$allHierarchy = Hierarchie::getAll(false);
+$tmpRevHierarchie=($id ? Hierarchie::getUpperLevel($allHierarchy, $id) : null);
 
 if ($id && empty($tmpHierarchie)) {
     $id = 0;
@@ -71,7 +68,6 @@ function flattenHierarchyForSelect(array $nodes, $depth = 0, array $allowedIds =
     return $result;
 }
 
-$allHierarchy = $viewHierarchy;
 $editableHierarchyOptions = flattenHierarchyForSelect($allHierarchy, 0, $editableHierarchyIds);
 $domainesList = $canReadCurrentLevel ? Hierarchie::getDomainesByLevel($id) : array();
 $showNoDomainReadOnlyAlert = ($id > 0) && $canReadCurrentLevel && !$canModifyCurrentLevel && empty($domainesList);
@@ -161,6 +157,78 @@ function renderHierarchySidebarTree(array $nodes, array $userRoles, array $roleR
     return $html;
 }
 
+function filterReadableHierarchyNavigation(array $nodes, array $userRoles, array $roleRank) {
+    $result = array();
+
+    foreach ($nodes as $node) {
+        $nodeId = (int)$node['id'];
+        $scope = 'hierarchie:' . $nodeId;
+        $nodeRole = isset($userRoles[$scope]) ? strtolower(trim((string)$userRoles[$scope])) : null;
+        $nodeRank = ($nodeRole !== null && isset($roleRank[$nodeRole])) ? (int)$roleRank[$nodeRole] : 0;
+        $nodeIsActive = !isset($node['actif']) || (int)$node['actif'] === 1;
+        $children = !empty($node['subItems'])
+            ? filterReadableHierarchyNavigation($node['subItems'], $userRoles, $roleRank)
+            : array();
+
+        if ($nodeIsActive && $nodeRank >= 1) {
+            $node['subItems'] = $children;
+            $result[] = $node;
+        } else {
+            foreach ($children as $child) {
+                $result[] = $child;
+            }
+        }
+    }
+
+    return $result;
+}
+
+$navigationHierarchy = filterReadableHierarchyNavigation($allHierarchy, $currentUser['roles'], $roleRank);
+
+function filterHierarchyWithReadablePaths(array $nodes, array $userRoles, array $roleRank) {
+    $result = array();
+
+    foreach ($nodes as $node) {
+        $nodeId = (int)$node['id'];
+        $scope = 'hierarchie:' . $nodeId;
+        $nodeRole = isset($userRoles[$scope]) ? strtolower(trim((string)$userRoles[$scope])) : null;
+        $nodeRank = ($nodeRole !== null && isset($roleRank[$nodeRole])) ? (int)$roleRank[$nodeRole] : 0;
+        $nodeIsActive = !isset($node['actif']) || (int)$node['actif'] === 1;
+        $children = !empty($node['subItems'])
+            ? filterHierarchyWithReadablePaths($node['subItems'], $userRoles, $roleRank)
+            : array();
+
+        if (($nodeIsActive && $nodeRank >= 1) || !empty($children)) {
+            $node['subItems'] = $children;
+            $result[] = $node;
+        }
+    }
+
+    return $result;
+}
+
+function getClosestCommonHierarchy(array $nodes, array $userRoles, array $roleRank) {
+    $current = $nodes;
+
+    while (count($current) === 1) {
+        $node = $current[0];
+        $scope = 'hierarchie:' . (int)$node['id'];
+        $nodeRole = isset($userRoles[$scope]) ? strtolower(trim((string)$userRoles[$scope])) : null;
+        $nodeRank = ($nodeRole !== null && isset($roleRank[$nodeRole])) ? (int)$roleRank[$nodeRole] : 0;
+        $children = !empty($node['subItems']) ? $node['subItems'] : array();
+
+        if ($nodeRank >= 1 || count($children) !== 1) {
+            break;
+        }
+        $current = $children;
+    }
+
+    return $current;
+}
+
+$zoomableHierarchy = filterHierarchyWithReadablePaths($allHierarchy, $currentUser['roles'], $roleRank);
+$sunburstHierarchy = getClosestCommonHierarchy($zoomableHierarchy, $currentUser['roles'], $roleRank);
+
 // Période affichée
 $aujourdhui = new DateTime();
 $moisCourant = (int)$aujourdhui->format('n');
@@ -181,7 +249,8 @@ if ($moisCourant >= 1 && $moisCourant <= 4) {
 $dateDebut = isset($_GET['date_debut']) ? $_GET['date_debut'] : $quadStart;
 $dateFin   = isset($_GET['date_fin'])   ? $_GET['date_fin']   : $quadEnd;
 
-$sunburstHierarchyData = buildSunburstTreeData($allHierarchy, $currentUser['roles'], $roleRank, $dateDebut, $dateFin);
+$sunburstHierarchyData = buildSunburstTreeData($sunburstHierarchy, $currentUser['roles'], $roleRank, $dateDebut, $dateFin);
+$zoomableHierarchyData = buildSunburstTreeData($zoomableHierarchy, $currentUser['roles'], $roleRank, $dateDebut, $dateFin);
 
 
 
@@ -232,7 +301,7 @@ include __DIR__ . '/includes/header.php';
             </div>
 
             <div class="pdc-sidebar-title"><i class="fa-solid fa-sitemap"></i> Niveaux</div>
-            <?php echo renderHierarchySidebarTree($allHierarchy, $currentUser['roles'], $roleRank, $isAdmin, $id, $dateDebut, $dateFin); ?>
+            <?php echo renderHierarchySidebarTree($navigationHierarchy, $currentUser['roles'], $roleRank, $isAdmin, $id, $dateDebut, $dateFin); ?>
         </aside>
 
         <div class="pdc-content" id="pdc-content">
@@ -637,6 +706,7 @@ var PDC = {
     currentDomaineId: null,
     isRootSelection: <?php echo ((int)$id === 0 ? 'true' : 'false'); ?>,
     hierarchyTree: <?php echo json_encode($sunburstHierarchyData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
+    zoomableHierarchyTree: <?php echo json_encode($zoomableHierarchyData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>,
 };
 
 // Création de projet - Convertir dates du format français (dd/mm/yyyy) au format ISO (yyyy-mm-dd)

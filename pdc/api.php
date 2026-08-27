@@ -20,10 +20,6 @@ $roleRank = array(
 );
 
 $userHasMinRoleOnHierarchy = function($hierarchieId, $minRole) use ($currentUser, $roleRank) {
-    $viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
-    if (!Hierarchie::isInView((int)$hierarchieId, $viewLevelId)) {
-        return false;
-    }
     $scope = 'hierarchie:' . (int)$hierarchieId;
     if (!isset($currentUser['roles'][$scope])) {
         return false;
@@ -381,57 +377,61 @@ try {
             echo json_encode(array('success' => true));
             break;
 
-        case 'set_bulk_user_scope_roles':
+        case 'copy_user_rights':
             if (!$isAdmin) throw new Exception('Accès refusé');
 
-            $usernames = json_decode(isset($_POST['usernames']) ? $_POST['usernames'] : '[]', true);
-            $levelIds = json_decode(isset($_POST['level_ids']) ? $_POST['level_ids'] : '[]', true);
-            $role = isset($_POST['role']) ? trim($_POST['role']) : '';
-            $allowedRoles = array('', 'aucun', 'lecteur', 'modificateur');
-
-            if (!is_array($usernames) || !is_array($levelIds) || !in_array($role, $allowedRoles, true)) {
+            $sourceUsername = isset($_POST['source_username']) ? trim($_POST['source_username']) : '';
+            $targetUsernames = json_decode(isset($_POST['target_usernames']) ? $_POST['target_usernames'] : '[]', true);
+            if ($sourceUsername === '' || !is_array($targetUsernames)) {
                 throw new Exception('Paramètres invalides');
             }
 
-            $usernames = array_values(array_unique(array_filter(array_map('trim', $usernames), 'strlen')));
-            $levelIds = array_values(array_unique(array_filter(array_map('intval', $levelIds), function($id) { return $id > 0; })));
-            $operationCount = count($usernames) * count($levelIds);
-
-            if ($operationCount === 0 || $operationCount > 50000) {
-                throw new Exception($operationCount > 50000 ? 'Trop de modifications en une seule opération (maximum 50 000)' : 'Sélection vide');
+            $targetUsernames = array_values(array_unique(array_filter(array_map('trim', $targetUsernames), function($username) use ($sourceUsername) {
+                return $username !== '' && $username !== $sourceUsername;
+            })));
+            if (empty($targetUsernames)) {
+                throw new Exception('Aucun utilisateur de destination sélectionné');
             }
 
             $db = Database::getInstance();
             $validUsers = array();
-            foreach ($db->fetchAll('SELECT username FROM pdc_utilisateurs') as $row) {
-                $validUsers[$row['username']] = true;
+            foreach ($db->fetchAll('SELECT username, niveau_id FROM pdc_utilisateurs') as $row) {
+                $validUsers[$row['username']] = $row;
             }
-            $validLevels = array();
-            foreach ($db->fetchAll('SELECT id FROM pdc_hierarchie') as $row) {
-                $validLevels[(int)$row['id']] = true;
+            if (!isset($validUsers[$sourceUsername])) {
+                throw new Exception('Utilisateur source inconnu');
             }
-
-            foreach ($usernames as $username) {
-                if (!isset($validUsers[$username])) throw new Exception('Utilisateur inconnu : ' . $username);
-            }
-            foreach ($levelIds as $levelId) {
-                if (!isset($validLevels[$levelId])) throw new Exception('Niveau hiérarchique inconnu : ' . $levelId);
+            foreach ($targetUsernames as $targetUsername) {
+                if (!isset($validUsers[$targetUsername])) {
+                    throw new Exception('Utilisateur de destination inconnu : ' . $targetUsername);
+                }
             }
 
+            $sourceRoles = $db->fetchAll(
+                'SELECT role_dn, role FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn <> ?',
+                array($sourceUsername, '*')
+            );
+            $sourceViewLevel = isset($validUsers[$sourceUsername]['niveau_id'])
+                ? (int)$validUsers[$sourceUsername]['niveau_id']
+                : 0;
             $pdo = $db->getPdo();
             $pdo->beginTransaction();
             try {
-                foreach ($usernames as $username) {
-                    foreach ($levelIds as $levelId) {
-                        $scope = 'hierarchie:' . $levelId;
-                        $db->execute('DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn = ?', array($username, $scope));
-                        if ($role !== '') {
-                            $db->insert(
-                                'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
-                                array($username, $scope, $role)
-                            );
-                        }
+                foreach ($targetUsernames as $targetUsername) {
+                    $db->execute(
+                        'DELETE FROM pdc_utilisateurs_roles WHERE username = ? AND role_dn <> ?',
+                        array($targetUsername, '*')
+                    );
+                    foreach ($sourceRoles as $sourceRole) {
+                        $db->insert(
+                            'INSERT INTO pdc_utilisateurs_roles (username, role_dn, role) VALUES (?, ?, ?)',
+                            array($targetUsername, $sourceRole['role_dn'], $sourceRole['role'])
+                        );
                     }
+                    $db->execute(
+                        'UPDATE pdc_utilisateurs SET niveau_id = ? WHERE username = ?',
+                        array($sourceViewLevel, $targetUsername)
+                    );
                 }
                 $pdo->commit();
             } catch (Exception $e) {
@@ -442,13 +442,13 @@ try {
             Journal::logModification(
                 $currentUser['username'],
                 Journal::getIp(),
-                'SET_BULK_SCOPE_ROLE',
+                'COPY_USER_RIGHTS',
                 'user',
                 0,
-                count($usernames) . ' utilisateur(s), ' . count($levelIds) . ' niveau(x), rôle : ' . ($role !== '' ? $role : 'aucun')
+                'Droits hiérarchiques et niveau de vue de ' . $sourceUsername . ' copiés vers ' . count($targetUsernames) . ' utilisateur(s)'
             );
 
-            echo json_encode(array('success' => true, 'updated' => $operationCount));
+            echo json_encode(array('success' => true, 'updated_users' => count($targetUsernames)));
             break;
 
         case 'set_user_global_admin':
@@ -499,7 +499,7 @@ try {
 
             $db->execute(
                 'UPDATE pdc_utilisateurs SET niveau_id = ? WHERE username = ?',
-                array($niveauId > 0 ? $niveauId : null, $username)
+                array($niveauId, $username)
             );
 
             Journal::logModification(

@@ -100,7 +100,7 @@
         var series = root.container.children.push(am5hierarchy.Sunburst.new(root, {
             singleBranchOnly: true,
                 downDepth: 2,
-                initialDepth: 1,
+            initialDepth: 3,
             topDepth: 1,
             valueField: 'value',
             categoryField: 'name',
@@ -417,6 +417,31 @@
             return;
         }
 
+        function readableHierarchy(nodes) {
+            var result = [];
+
+            (nodes || []).forEach(function(node) {
+                var children = readableHierarchy(node.children || []);
+
+                if (node.state === 'inaccessible') {
+                    children.forEach(function(child) {
+                        result.push(child);
+                    });
+                    return;
+                }
+
+                var readableNode = {};
+                Object.keys(node).forEach(function(key) {
+                    if (key !== 'children') readableNode[key] = node[key];
+                });
+                readableNode.children = children;
+                readableNode.value = children.length ? null : 1;
+                result.push(readableNode);
+            });
+
+            return result;
+        }
+
         function renderForceTree() {
             if (chartRoot) {
                 chartRoot.resize();
@@ -431,7 +456,7 @@
             var data = {
                 name: 'Plan de charge',
                 state: 'readonly',
-                children: PDC.hierarchyTree
+                children: Array.isArray(PDC.zoomableHierarchyTree) ? PDC.zoomableHierarchyTree : readableHierarchy(PDC.hierarchyTree)
             };
 
             chartRoot = am5.Root.new(host);
@@ -469,7 +494,7 @@
                 var depth = target.dataItem ? Number(target.dataItem.get('depth')) || 0 : 0;
                 var visibleDepth = Math.max(0, depth - 1);
 
-                return Math.max(18, 44 * Math.pow(0.75, visibleDepth));
+                return Math.max(24, 60 * Math.pow(0.75, visibleDepth));
             });
             series.circles.template.adapters.add('fill', function(fill, target) {
                 var context = target.dataItem && target.dataItem.dataContext;

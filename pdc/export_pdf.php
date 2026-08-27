@@ -14,12 +14,6 @@ if ($hierarchieId <= 0) {
     die('Niveau de hierarchie invalide.');
 }
 
-$viewLevelId = isset($currentUser['niveau_id']) ? (int)$currentUser['niveau_id'] : 0;
-if (!Hierarchie::isInView($hierarchieId, $viewLevelId)) {
-    http_response_code(403);
-    die('Acces refuse. Ce niveau est hors de votre vue.');
-}
-
 $roleRank = array(
     'lecteur' => 1,
     'modificateur' => 2,
