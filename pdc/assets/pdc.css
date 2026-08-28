@@ -960,6 +960,7 @@
     border-right-color: inherit;
     border-top: 10px solid transparent;
     border-bottom: 10px solid transparent;
+    cursor: pointer;
 }
 
 .pdc-frise-arrow-after:after {
@@ -973,6 +974,7 @@
     border-left-color: inherit;
     border-top: 10px solid transparent;
     border-bottom: 10px solid transparent;
+    cursor: pointer;
 }
 
 .pdc-weeks {

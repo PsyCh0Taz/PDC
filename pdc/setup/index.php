@@ -53,6 +53,91 @@ function setupExpectedDatabaseSchema() {
     );
 }
 
+function setupSchemaDefaultValue($value) {
+    if ($value === null) {
+        return null;
+    }
+    return strtoupper(trim((string)$value)) === 'CURRENT_TIMESTAMP' ? 'CURRENT_TIMESTAMP' : (string)$value;
+}
+
+function setupParseColumnDefinition($definition) {
+    $definition = trim(rtrim($definition, ','));
+    if (!preg_match('/^`([^`]+)`\s+(.+)$/s', $definition, $matches)) {
+        return null;
+    }
+
+    $details = $matches[2];
+    preg_match('/^([a-z]+(?:\([^)]*\))?(?:\s+unsigned)?)/i', $details, $typeMatch);
+    $default = null;
+    if (preg_match('/\sDEFAULT\s+(CURRENT_TIMESTAMP|NULL|\'([^\']*)\')/i', $details, $defaultMatch)) {
+        $default = strtoupper($defaultMatch[1]) === 'NULL'
+            ? null
+            : (isset($defaultMatch[2]) ? $defaultMatch[2] : strtoupper($defaultMatch[1]));
+    }
+
+    return array(
+        'name' => $matches[1],
+        'type' => strtolower(isset($typeMatch[1]) ? preg_replace('/\s+/', ' ', $typeMatch[1]) : ''),
+        'nullable' => stripos($details, 'NOT NULL') === false,
+        'default' => setupSchemaDefaultValue($default),
+        'auto_increment' => stripos($details, 'AUTO_INCREMENT') !== false,
+    );
+}
+
+function setupExpectedDatabaseDefinition() {
+    $sql = @file_get_contents(__DIR__ . '/../pdc.sql');
+    if ($sql === false) {
+        throw new Exception('Fichier de reference pdc.sql introuvable.');
+    }
+
+    $schema = array();
+    preg_match_all('/CREATE TABLE\s+`([^`]+)`\s*\((.*?)\)\s*ENGINE=([^\s;]+)/is', $sql, $tables, PREG_SET_ORDER);
+    foreach ($tables as $table) {
+        $schema[$table[1]] = array('engine' => strtolower($table[3]), 'columns' => array(), 'indexes' => array(), 'foreign_keys' => array());
+        foreach (preg_split('/\r?\n/', $table[2]) as $line) {
+            $column = setupParseColumnDefinition($line);
+            if ($column !== null) {
+                $schema[$table[1]]['columns'][$column['name']] = $column;
+            }
+        }
+    }
+
+    // Les liens de partage sont optionnels et ne font pas partie du controle applicatif.
+    unset($schema['pdc_share_links']);
+
+    preg_match_all('/ALTER TABLE\s+`([^`]+)`\s+(.*?);/is', $sql, $alters, PREG_SET_ORDER);
+    foreach ($alters as $alter) {
+        $tableName = $alter[1];
+        if (!isset($schema[$tableName])) {
+            continue;
+        }
+        $body = $alter[2];
+        preg_match_all('/MODIFY\s+(`[^`]+`\s+[^,;]+)/i', $body, $modifies, PREG_SET_ORDER);
+        foreach ($modifies as $modify) {
+            $column = setupParseColumnDefinition($modify[1]);
+            if ($column !== null) {
+                $schema[$tableName]['columns'][$column['name']] = $column;
+            }
+        }
+        preg_match_all('/ADD\s+(PRIMARY KEY|UNIQUE KEY\s+`([^`]+)`|KEY\s+`([^`]+)`)\s*\(([^)]+)\)/i', $body, $indexes, PREG_SET_ORDER);
+        foreach ($indexes as $index) {
+            $kind = strtoupper($index[1]) === 'PRIMARY KEY' ? 'PRIMARY' : (stripos($index[1], 'UNIQUE') === 0 ? 'UNIQUE' : 'INDEX');
+            $name = $kind === 'PRIMARY' ? 'PRIMARY' : ($index[2] !== '' ? $index[2] : $index[3]);
+            $columns = preg_replace('/[`\s]/', '', $index[4]);
+            $schema[$tableName]['indexes'][$kind . '|' . $name . '|' . $columns] = true;
+        }
+        preg_match_all('/ADD\s+CONSTRAINT\s+`([^`]+)`\s+FOREIGN KEY\s*\(([^)]+)\)\s+REFERENCES\s+`([^`]+)`\s*\(([^)]+)\)(?:\s+ON DELETE\s+([A-Z ]+?))?(?:\s+ON UPDATE\s+([A-Z ]+?))?(?:\s|$)/i', $body . ' ', $foreignKeys, PREG_SET_ORDER);
+        foreach ($foreignKeys as $foreignKey) {
+            $deleteRule = isset($foreignKey[5]) && trim($foreignKey[5]) !== '' ? strtoupper(trim($foreignKey[5])) : 'RESTRICT';
+            $updateRule = isset($foreignKey[6]) && trim($foreignKey[6]) !== '' ? strtoupper(trim($foreignKey[6])) : 'RESTRICT';
+            $key = $foreignKey[1] . '|' . preg_replace('/[`\s]/', '', $foreignKey[2]) . '|' . $foreignKey[3] . '|' . preg_replace('/[`\s]/', '', $foreignKey[4]) . '|' . $deleteRule . '|' . $updateRule;
+            $schema[$tableName]['foreign_keys'][$key] = true;
+        }
+    }
+
+    return $schema;
+}
+
 $configValues = array(
     'db_host' => DB_HOST,
     'db_name' => DB_NAME,
@@ -313,9 +398,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             );
 
             $currentStep = 'Controle du schema des tables de donnees';
-            $expectedSchema = setupExpectedDatabaseSchema();
+            $expectedSchema = setupExpectedDatabaseDefinition();
             $schemaStmt = $pdo->prepare(
-                'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS '
+                'SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA FROM information_schema.COLUMNS '
                 . 'WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION'
             );
             $schemaStmt->execute(array(DB_NAME));
@@ -325,38 +410,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (!isset($actualSchema[$tableName])) {
                     $actualSchema[$tableName] = array();
                 }
-                $actualSchema[$tableName][] = $column['COLUMN_NAME'];
+                $actualSchema[$tableName][$column['COLUMN_NAME']] = array(
+                    'type' => strtolower(preg_replace('/\s+/', ' ', $column['COLUMN_TYPE'])),
+                    'nullable' => $column['IS_NULLABLE'] === 'YES',
+                    'default' => setupSchemaDefaultValue($column['COLUMN_DEFAULT']),
+                    'auto_increment' => stripos($column['EXTRA'], 'auto_increment') !== false,
+                );
+            }
+
+            $tableStmt = $pdo->prepare('SELECT TABLE_NAME, ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?');
+            $tableStmt->execute(array(DB_NAME));
+            $actualTables = array();
+            foreach ($tableStmt->fetchAll(PDO::FETCH_ASSOC) as $table) {
+                $actualTables[$table['TABLE_NAME']] = strtolower((string)$table['ENGINE']);
+            }
+
+            $indexStmt = $pdo->prepare('SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX');
+            $indexStmt->execute(array(DB_NAME));
+            $actualIndexes = array();
+            foreach ($indexStmt->fetchAll(PDO::FETCH_ASSOC) as $index) {
+                $tableName = $index['TABLE_NAME'];
+                $indexName = $index['INDEX_NAME'];
+                if (!isset($actualIndexes[$tableName][$indexName])) {
+                    $actualIndexes[$tableName][$indexName] = array('unique' => (int)$index['NON_UNIQUE'] === 0, 'columns' => array());
+                }
+                $actualIndexes[$tableName][$indexName]['columns'][] = $index['COLUMN_NAME'];
+            }
+
+            $foreignKeyStmt = $pdo->prepare('SELECT k.TABLE_NAME, k.CONSTRAINT_NAME, k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.DELETE_RULE, r.UPDATE_RULE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME AND r.TABLE_NAME = k.TABLE_NAME WHERE k.CONSTRAINT_SCHEMA = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION');
+            $foreignKeyStmt->execute(array(DB_NAME));
+            $actualForeignKeys = array();
+            foreach ($foreignKeyStmt->fetchAll(PDO::FETCH_ASSOC) as $foreignKey) {
+                $tableName = $foreignKey['TABLE_NAME'];
+                $keyName = $foreignKey['CONSTRAINT_NAME'];
+                if (!isset($actualForeignKeys[$tableName][$keyName])) {
+                    $actualForeignKeys[$tableName][$keyName] = array('columns' => array(), 'ref_table' => $foreignKey['REFERENCED_TABLE_NAME'], 'ref_columns' => array(), 'delete' => strtoupper($foreignKey['DELETE_RULE']), 'update' => strtoupper($foreignKey['UPDATE_RULE']));
+                }
+                $actualForeignKeys[$tableName][$keyName]['columns'][] = $foreignKey['COLUMN_NAME'];
+                $actualForeignKeys[$tableName][$keyName]['ref_columns'][] = $foreignKey['REFERENCED_COLUMN_NAME'];
             }
 
             $missingTables = array();
-            $missingColumns = array();
-            foreach ($expectedSchema as $tableName => $expectedColumns) {
-                if (!isset($actualSchema[$tableName])) {
+            $problems = array();
+            foreach ($expectedSchema as $tableName => $expectedTable) {
+                if (!isset($actualTables[$tableName])) {
                     $missingTables[] = $tableName;
                     continue;
                 }
-
-                $missing = array_values(array_diff($expectedColumns, $actualSchema[$tableName]));
-                if (!empty($missing)) {
-                    $missingColumns[$tableName] = $missing;
+                if ($actualTables[$tableName] !== $expectedTable['engine']) {
+                    $problems[] = $tableName . ' (moteur attendu ' . $expectedTable['engine'] . ', obtenu ' . $actualTables[$tableName] . ')';
+                }
+                foreach ($expectedTable['columns'] as $columnName => $expectedColumn) {
+                    if (!isset($actualSchema[$tableName][$columnName])) {
+                        $problems[] = $tableName . '.' . $columnName . ' (colonne absente)';
+                        continue;
+                    }
+                    $actualColumn = $actualSchema[$tableName][$columnName];
+                    foreach (array('type', 'nullable', 'default', 'auto_increment') as $property) {
+                        if ($actualColumn[$property] !== $expectedColumn[$property]) {
+                            $problems[] = $tableName . '.' . $columnName . ' (' . $property . ' attendu ' . var_export($expectedColumn[$property], true) . ', obtenu ' . var_export($actualColumn[$property], true) . ')';
+                        }
+                    }
+                }
+                $actualIndexKeys = array();
+                if (isset($actualIndexes[$tableName])) {
+                    foreach ($actualIndexes[$tableName] as $indexName => $index) {
+                        $kind = $indexName === 'PRIMARY' ? 'PRIMARY' : ($index['unique'] ? 'UNIQUE' : 'INDEX');
+                        $actualIndexKeys[$kind . '|' . $indexName . '|' . implode(',', $index['columns'])] = true;
+                    }
+                }
+                foreach ($expectedTable['indexes'] as $indexKey => $unused) {
+                    if (!isset($actualIndexKeys[$indexKey])) {
+                        $problems[] = $tableName . ' (index absent : ' . $indexKey . ')';
+                    }
+                }
+                $actualForeignKeyKeys = array();
+                if (isset($actualForeignKeys[$tableName])) {
+                    foreach ($actualForeignKeys[$tableName] as $foreignKeyName => $foreignKey) {
+                        $actualForeignKeyKeys[$foreignKeyName . '|' . implode(',', $foreignKey['columns']) . '|' . $foreignKey['ref_table'] . '|' . implode(',', $foreignKey['ref_columns']) . '|' . $foreignKey['delete'] . '|' . $foreignKey['update']] = true;
+                    }
+                }
+                foreach ($expectedTable['foreign_keys'] as $foreignKeyKey => $unused) {
+                    if (!isset($actualForeignKeyKeys[$foreignKeyKey])) {
+                        $problems[] = $tableName . ' (cle etrangere absente : ' . $foreignKeyKey . ')';
+                    }
                 }
             }
 
-            if (!empty($missingTables) || !empty($missingColumns)) {
-                $problems = array();
-                if (!empty($missingTables)) {
-                    $problems[] = 'tables absentes : ' . implode(', ', $missingTables);
-                }
-                foreach ($missingColumns as $tableName => $columns) {
-                    $problems[] = $tableName . ' (colonnes absentes : ' . implode(', ', $columns) . ')';
-                }
-                throw new Exception('Schema incomplet - ' . implode(' ; ', $problems) . '.');
+            if (!empty($missingTables)) {
+                $problems[] = 'tables absentes : ' . implode(', ', $missingTables);
+            }
+            if (!empty($problems)) {
+                throw new Exception('Schema non conforme a pdc.sql - ' . implode(' ; ', $problems) . '.');
             }
 
             $steps[] = array(
                 'label' => $currentStep,
                 'status' => 'ok',
-                'detail' => count($expectedSchema) . ' tables controlees, toutes les colonnes obligatoires sont presentes.',
+                'detail' => count($expectedSchema) . ' tables controlees : colonnes, types, valeurs par defaut, auto-increments, moteur, index et cles etrangeres conformes.',
             );
 
             $dbResult = array(

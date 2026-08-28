@@ -800,6 +800,54 @@
         $('.pdc-frise').each(function() {
             renderFrise($(this));
         });
+
+        $(document).on('click', '.pdc-frise-arrow-before, .pdc-frise-arrow-after', function(e) {
+            var rect = this.getBoundingClientRect();
+            var isBefore = $(this).hasClass('pdc-frise-arrow-before');
+            var isAfter = $(this).hasClass('pdc-frise-arrow-after');
+            var clickedBeforeHead = isBefore && e.clientX <= rect.left + 10;
+            var clickedAfterHead = isAfter && e.clientX >= rect.right - 10;
+
+            // La barre reste disponible pour le double-clic d'édition des gradients.
+            if (!clickedBeforeHead && !clickedAfterHead) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+            shiftDisplayedPeriod(isBefore ? -1 : 1);
+        });
+    }
+
+    function shiftDisplayedPeriod(direction) {
+        var $form = $('#periode_form');
+        var $dateDebut = $form.find('input[name="date_debut"]');
+        var $dateFin = $form.find('input[name="date_fin"]');
+        var periodeDebut = parseISODate(convertToISO($dateDebut.val()));
+        var periodeFin = parseISODate(convertToISO($dateFin.val()));
+        var durationDays = Math.round(
+            (Date.UTC(periodeFin.getFullYear(), periodeFin.getMonth(), periodeFin.getDate()) -
+             Date.UTC(periodeDebut.getFullYear(), periodeDebut.getMonth(), periodeDebut.getDate())) /
+            (1000 * 60 * 60 * 24)
+        );
+
+        if (!$form.length || durationDays <= 0) {
+            return;
+        }
+
+        periodeDebut.setDate(periodeDebut.getDate() + (direction * durationDays));
+        periodeFin.setDate(periodeFin.getDate() + (direction * durationDays));
+
+        $dateDebut.val(convertToFrench(formatISODate(periodeDebut)));
+        $dateFin.val(convertToFrench(formatISODate(periodeFin)));
+        $form.trigger('submit');
+    }
+
+    function formatISODate(date) {
+        var year = date.getFullYear();
+        var month = ('0' + (date.getMonth() + 1)).slice(-2);
+        var day = ('0' + date.getDate()).slice(-2);
+        return year + '-' + month + '-' + day;
     }
 
     function focusJalonRow(jalonId) {
@@ -1675,11 +1723,11 @@
             } else {
                 // Remplir le tableau avec les jalons triés
                 var $frise = $('.pdc-frise[data-projet-id="' + projetId + '"]');
-                var jalons = $frise.data('jalons') || [];
+                var jalons = ($frise.data('jalons') || []).slice();
                 
                 // Trier les jalons par date
-                jalons = jalons.sort(function(a, b) {
-                    return new Date(a.date_jalon) - new Date(b.date_jalon);
+                jalons.sort(function(a, b) {
+                    return String(a.date_jalon || '').localeCompare(String(b.date_jalon || ''));
                 });
                 
                 // Remplir le tableau

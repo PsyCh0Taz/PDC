@@ -421,8 +421,8 @@ include __DIR__ . '/includes/header.php';
                                     data-date-fin="<?php echo $projet['date_fin']; ?>"
                                     data-periode-debut="<?php echo $dateDebut; ?>"
                                     data-periode-fin="<?php echo $dateFin; ?>"
-                                    data-gradients='<?php echo json_encode($gradients); ?>'
-                                    data-jalons='<?php echo json_encode($jalons); ?>'>
+                                    data-gradients='<?php echo htmlspecialchars(json_encode($gradients), ENT_QUOTES, 'UTF-8'); ?>'
+                                    data-jalons='<?php echo htmlspecialchars(json_encode($jalons), ENT_QUOTES, 'UTF-8'); ?>'>
                             </div>
                             <button class="pdc-jalons-toggle-btn" data-projet-id="<?php echo $projet['id']; ?>" title="Afficher/Masquer les jalons">
                                 <i class="fa-solid fa-angles-down"></i>

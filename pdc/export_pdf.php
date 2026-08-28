@@ -340,8 +340,8 @@ header('Content-Type: text/html; charset=utf-8');
                         data-date-fin="<?php echo htmlspecialchars($projet['date_fin'], ENT_QUOTES, 'UTF-8'); ?>"
                         data-periode-debut="<?php echo htmlspecialchars($dateDebut, ENT_QUOTES, 'UTF-8'); ?>"
                         data-periode-fin="<?php echo htmlspecialchars($dateFin, ENT_QUOTES, 'UTF-8'); ?>"
-                        data-gradients='<?php echo json_encode($gradients); ?>'
-                        data-jalons='<?php echo json_encode($jalons); ?>'>
+                        data-gradients='<?php echo htmlspecialchars(json_encode($gradients), ENT_QUOTES, 'UTF-8'); ?>'
+                        data-jalons='<?php echo htmlspecialchars(json_encode($jalons), ENT_QUOTES, 'UTF-8'); ?>'>
                     </div>
                 </div>
 

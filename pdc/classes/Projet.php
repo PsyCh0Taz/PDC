@@ -43,7 +43,7 @@ class Projet {
     public static function getJalons($projetId) {
         $db = Database::getInstance();
         $rows = $db->fetchAll(
-            'SELECT * FROM pdc_projet_jalons WHERE projet_id = ? ORDER BY date_jalon ASC',
+            'SELECT * FROM pdc_projet_jalons WHERE projet_id = ? ORDER BY date_jalon ASC, id ASC',
             array((int)$projetId)
         );
 
